@@ -59,6 +59,7 @@ ReflowDisplay::ReflowDisplay() {
 }
 
 void ReflowDisplay::display(int n) {
+  stopMarquee();
   char neg = 0;
   if (n < 0) {
     n = n*-1;
