@@ -119,7 +119,7 @@ void ReflowDisplay::displayChars(char * chars, int len) {
 }
 
 void ReflowDisplay::tick() {
-  if (tickCounter % 500 == 0) {
+  if (tickCounter % 200 == 0) {
     marqueeHandler();
     tickCounter = 0;
   }

@@ -21,7 +21,13 @@ Encoder myEnc(ENC_A, ENC_B);
 Adafruit_MAX31855 thermocouple(TC_CS);
 ReflowDisplay display;
 
+char* menu[] = {"monitor","st-soak temp","sd-soak duration","pt-peak temp","go"};
+int menuSize = 5;
+int dsize = 3;
+byte data[3] = {0,0,0};
+
 void setup() {
+  Serial.begin(9600);
   strip.begin();
   strip.show();
   
@@ -78,12 +84,12 @@ byte displayMenu(char * options[], int len, int defaultChoice) {
   int menuIndex = -1;
   setEnc(defaultChoice);
   while(1) {
-    if (debounceButton(BACK_BUTTON)) {
+    if (debounceButton(ENC_BUTTON)) {
       display.clear();
       return menuIndex;
     }
 //    if (debounceButton(BACK_BUTTON)) {
-//      stopMarquee();
+//      display.clear();
 //      return -1;
 //    }
     
@@ -100,6 +106,13 @@ byte displayMenu(char * options[], int len, int defaultChoice) {
     }
     
     if (newIndex != menuIndex) {
+      Serial.print("update!: ");
+      Serial.print(data[0]);
+      Serial.print(", ");
+      Serial.print(data[1]);
+      Serial.print(", ");
+      Serial.print(data[2]);
+      Serial.print("\n");
       menuIndex = newIndex;
       display.displayMarquee(options[menuIndex]);
     }
@@ -115,7 +128,7 @@ int chooseNum(int low, int high, int defaultVal) {
   setEnc(val);
   while(1) {
     if (debounceButton(ENC_BUTTON)) return val;
-    if (debounceButton(BACK_BUTTON)) return val;
+    if (debounceButton(BACK_BUTTON)) return defaultVal;
     
     val = getEnc();
     if (val > high) {
@@ -132,34 +145,54 @@ int chooseNum(int low, int high, int defaultVal) {
   }
 }
 
-char* menu[] = {"st-soak temp","sd-soak duration","pt-peak temp","go"};
-int dsize = 3;
-byte data[3] = {0,0,0};
+byte editSetting(byte index) {
+  Serial.println(index);
+  Serial.println(data[index]);
+  data[index] = chooseNum(0,255,data[index]);
+  EEPROM.write(index,data[index]);
+}
+
+void monitorTemp() {
+  while(1) {
+    double temp = readThermocouple();
+    Serial.println(temp);
+    display.display((int)temp);
+    
+    if (debounceButton(ENC_BUTTON)) return;
+    if (debounceButton(BACK_BUTTON)) return;
+    
+    delay(100);
+  } 
+}
+
 byte mainMenu() {
   int choice = 0;
   while(1) {
-    choice = displayMenu(menu,4,choice);
+    choice = displayMenu(menu,menuSize,choice);
     if (choice == -1) return 0; //re-enter menu
-    if (choice == 3) return -1;
-    data[choice] = chooseNum(0,255,data[choice]);
-    EEPROM.write(choice,data[choice]);
+    if (choice == menuSize-1) return -1;
+    if (choice == 0) monitorTemp();
+    if (choice >= 1 && choice <= 3) {
+      editSetting(choice-1);
+    }
   }
 }
 
 void ovenOn() {
-//    digitalWrite(RELAY,HIGH);
-    strip.setPixelColor(0, strip.Color(10,10,10));
-    strip.show();
+  digitalWrite(RELAY,HIGH);
+//  strip.setPixelColor(0, strip.Color(10,10,10));
+//  strip.show();
 }
 
 void ovenOff() {
-//    digitalWrite(RELAY,LOW);
-    strip.setPixelColor(0, strip.Color(0,0,0));
-    strip.show();
+  digitalWrite(RELAY,LOW);
+//  strip.setPixelColor(0, strip.Color(0,0,0));
+//  strip.show();
 }
 
 double readThermocouple() {
-  return getEnc(); //for testing purposes
+  return thermocouple.readCelsius();
+//  return getEnc();
 }
 
 #define DEFAULT_SOAK_TEMP 100
@@ -201,7 +234,7 @@ byte doReflow() {
   byte soakTemp = data[0];
   byte soakTime = data[1];
   byte peakTemp = data[2];
-  setEnc(25);
+  setEnc(25); //TODO remove me for production
   
   ovenOn();
   while(1) {
