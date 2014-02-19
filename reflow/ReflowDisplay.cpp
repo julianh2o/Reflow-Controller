@@ -1,8 +1,8 @@
 #include "ReflowDisplay.h"
 
-//TODO remove these
-int MARQUEE_START_WAIT = 4;
-int MARQUEE_END_WAIT = 1;
+//TODO remove these, but keep the function somehow
+int MARQUEE_START_WAIT = 3;
+int MARQUEE_END_WAIT = 3;
 
 byte ReflowDisplay::numerals[] = {0b01111110,0b00110000,0b01101101,0b01111001,0b00110011,0b01011011,0b00011111,0b01110000,0b01111111,0b01110011};
 byte ReflowDisplay::alphabet[] = {
@@ -79,7 +79,7 @@ void ReflowDisplay::display(char * s) {
 
 void ReflowDisplay::displayMarquee(char * chars) {
   marqueeIndex = -MARQUEE_START_WAIT;
-  marqueeIndex = 0;
+  //marqueeIndex = 0;
   marqueeString = chars;
   marqueeLength = strlen(chars);
   displayChars(marqueeString,3);
@@ -92,13 +92,20 @@ void ReflowDisplay::clear() {
 void ReflowDisplay::marqueeHandler() {
   if (marqueeLength == 0) return; //no current marquee
   
-  if (marqueeIndex >= 0 && marqueeIndex <= marqueeLength-3) {
-    displayChars(marqueeString+marqueeIndex,3);
-  }
+  //if (marqueeIndex >= 0 && marqueeIndex <= marqueeLength-3) {
+   if (marqueeIndex >= marqueeLength-3+MARQUEE_END_WAIT) { //last index after the end pause is blank
+     displayChars("   ",3);
+   } else if (marqueeIndex >= marqueeLength-3) { //after scrolling, pause on the last 3 chars
+     displayChars(marqueeString+marqueeLength-3,3);
+   } else if (marqueeIndex >= 0) { //this is the meat of the string and the scroll
+     displayChars(marqueeString+marqueeIndex,3);
+   } else if (marqueeIndex == -MARQUEE_START_WAIT) { //prior to scrolling, pause on the first 3 chars
+     displayChars(marqueeString,3);
+   }
   
-  marqueeIndex++;
+  if (marqueeLength > 3) marqueeIndex++;  //no scrolling unless the string is more than 3 chars long
 //  if (marqueeIndex >= marqueeLength) marqueeIndex = 0;
-  if (marqueeIndex >= marqueeLength-3+MARQUEE_END_WAIT) marqueeIndex = -MARQUEE_START_WAIT;
+  if (marqueeIndex >= marqueeLength-3+MARQUEE_END_WAIT+1) marqueeIndex = -MARQUEE_START_WAIT;
 }
 
 void ReflowDisplay::stopMarquee() {
