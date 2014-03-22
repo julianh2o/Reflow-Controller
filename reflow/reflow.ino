@@ -93,10 +93,56 @@ byte buttonDown(int b) {
   return !digitalRead(b);
 }
 
+void processCommands() {
+  char buffer[30];
+  char i = 0;
+  while (Serial.available()) {
+    buffer[i++] = Serial.read();
+  }
+  if (i != 0) {
+    buffer[i] = 0;
+    String command = String(buffer);
+    int spaceAt = command.indexOf(" ");
+    String arguments = command.substring(spaceAt+1);
+    if (spaceAt == -1) arguments = "";
+    Serial.write("you entered: ");
+    Serial.write(buffer);
+    Serial.write("\n");
+    if (command.startsWith("relay ")) {
+      if (arguments.equalsIgnoreCase("on")) {
+        relayOn();
+      } else if (arguments.equalsIgnoreCase("off")) {
+        relayOff();        
+      } else if (arguments.equalsIgnoreCase("toggle")) {
+        relayToggle();
+      }
+    } else if (command.startsWith("setst ")) {
+      setData(0,(byte)arguments.toInt());
+      Serial.print("Set soak temperature: ");
+      Serial.println(data[0]);
+      //TODO range checking
+    } else if (command.startsWith("setsd ")) {
+      setData(1,(byte)arguments.toInt());
+      Serial.print("Set soak duration: ");
+      Serial.println(data[1]);
+    } else if (command.startsWith("setpt ")) {
+      setData(2,(byte)arguments.toInt());
+      Serial.print("Set peak temperature: ");
+      Serial.println(data[2]);
+    }
+//      Serial.write("relay command!\n");
+//      Serial.write("arguments:");
+//      Serial.print(arguments);
+//      Serial.write("\n");
+  }
+}
+
 byte displayMenu(char * options[], int len, int defaultChoice) {
   int menuIndex = -1;
   setEnc(defaultChoice);
   while(1) {
+    processCommands();
+    
     if (debounceButton(ENC_BUTTON)) {
       display.clear();
       return menuIndex;
@@ -152,14 +198,12 @@ int chooseNum(int low, int high, int defaultVal) {
 }
 
 byte editSetting(byte index) {
-<<<<<<< HEAD
-=======
-  Serial.println("EEPROM Write");
-  Serial.println(index);
-  Serial.println(data[index]);
->>>>>>> b25adc26b9ca82c208d88877be4cff95bd6d3022
-  data[index] = chooseNum(0,255,data[index]);
-  EEPROM.write(index,data[index]);
+  setData(index,chooseNum(0,255,data[index]));
+}
+
+void setData(byte index, byte value) {
+  data[index] = value;
+  EEPROM.write(index,data[index]); 
 }
 
 void monitorTemp() {
@@ -169,7 +213,7 @@ void monitorTemp() {
     double temp = readThermocouple();
     display.display((int)temp);
 
-    if ((millis() - lastReport) > 100) {  //generate a 100ms event period
+    if ((millis() - lastReport) > 1000) {  //generate a 1000ms event period
       Serial.println(temp);
       lastReport += 100;
     }
@@ -194,18 +238,26 @@ byte mainMenu() {
   }
 }
 
-void ovenOn() {
+void relayOn() {
   digitalWrite(RELAY,HIGH);
   Serial.println("Relay ON");
 //  strip.setPixelColor(0, strip.Color(10,10,10));
 //  strip.show();
 }
 
-void ovenOff() {
+void relayOff() {
   digitalWrite(RELAY,LOW);
   Serial.println("Relay OFF");
 //  strip.setPixelColor(0, strip.Color(0,0,0));
 //  strip.show();
+}
+
+void relayToggle() {
+  if (digitalRead(RELAY)) {
+    relayOff();
+  } else {
+    relayOn();    
+  }
 }
 
 double readThermocouple() {
@@ -255,7 +307,7 @@ byte doReflow() {
   byte peakTemp = data[2];
   setEnc(25); //TODO remove me for production
   
-  ovenOn();
+  relayOn();
   while(1) {
     double temp = readThermocouple();
     
@@ -272,7 +324,7 @@ byte doReflow() {
       }
     } else {
       if ((millis() - buttonStartTime) > CANCEL_TIME) {
-        ovenOff();
+        relayOff();
         return -1;
       }
       if (!buttonDown(BACK_BUTTON)) buttonStartTime = 0;
@@ -282,7 +334,7 @@ byte doReflow() {
         if (temp >= soakTemp) {
           phase = PHASE_SOAK;
           phaseStartTime = millis();
-          ovenOff();
+          relayOff();
         }
         break;
       }
@@ -292,7 +344,7 @@ byte doReflow() {
         if (currentSoakSeconds > soakTime) {
           phase = PHASE_SPIKE;
           phaseStartTime = millis();
-          ovenOn();
+          relayOn();
         }
         break;
       }
@@ -301,7 +353,7 @@ byte doReflow() {
         if (temp >= peakTemp) {
           phase = PHASE_COOL;
           phaseStartTime = millis();
-          ovenOff();
+          relayOff();
         }
         break;
       }
@@ -309,7 +361,7 @@ byte doReflow() {
       case PHASE_COOL: {
         unsigned long currentCoolSeconds = (millis() - phaseStartTime) / 1000;
         if (currentCoolSeconds > 30 || temp < 60 || debounceButton(BACK_BUTTON) || debounceButton(ENC_BUTTON)) {
-          ovenOff();
+          relayOff();
           return 0;
         }
         break;
