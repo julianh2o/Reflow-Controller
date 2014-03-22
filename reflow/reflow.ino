@@ -21,6 +21,12 @@ Encoder myEnc(ENC_A, ENC_B);
 Adafruit_MAX31855 thermocouple(TC_CS);
 ReflowDisplay display;
 
+const int CMD_REFLOW_START=1;
+const int CMD_REFLOW_STOP=2;
+
+const int MODE_MAIN_MENU=1;
+const int MODE_REFLOW=2;
+
 char* menu[] = {"monitor","st-soak temp","sd-soak duration","pt-peak temp","go"};
 int menuSize = 5;
 int dsize = 3;
@@ -93,7 +99,7 @@ byte buttonDown(int b) {
   return !digitalRead(b);
 }
 
-void processCommands() {
+int processCommands(int mode) {
   char buffer[30];
   char i = 0;
   while (Serial.available()) {
@@ -105,35 +111,61 @@ void processCommands() {
     int spaceAt = command.indexOf(" ");
     String arguments = command.substring(spaceAt+1);
     if (spaceAt == -1) arguments = "";
-    Serial.write("you entered: ");
+    Serial.write("> ");
     Serial.write(buffer);
     Serial.write("\n");
-    if (command.startsWith("relay ")) {
-      if (arguments.equalsIgnoreCase("on")) {
-        relayOn();
-      } else if (arguments.equalsIgnoreCase("off")) {
-        relayOff();        
-      } else if (arguments.equalsIgnoreCase("toggle")) {
-        relayToggle();
+    if (mode == MODE_MAIN_MENU) {
+      if (command.startsWith("relay ")) {
+        if (arguments.equalsIgnoreCase("on")) {
+          relayOn();
+        } else if (arguments.equalsIgnoreCase("off")) {
+          relayOff();        
+        } else if (arguments.equalsIgnoreCase("toggle")) {
+          relayToggle();
+        }
+      } else if (command.startsWith("setst ")) {
+        setData(0,(byte)arguments.toInt());
+        Serial.print("Set soak temperature: ");
+        Serial.println(data[0]);
+        //TODO range checking
+      } else if (command.startsWith("setsd ")) {
+        setData(1,(byte)arguments.toInt());
+        Serial.print("Set soak duration: ");
+        Serial.println(data[1]);
+      } else if (command.startsWith("setpt ")) {
+        setData(2,(byte)arguments.toInt());
+        Serial.print("Set peak temperature: ");
+        Serial.println(data[2]);
+      } else if (command.equalsIgnoreCase("start")) {
+        return CMD_REFLOW_START;
       }
-    } else if (command.startsWith("setst ")) {
-      setData(0,(byte)arguments.toInt());
-      Serial.print("Set soak temperature: ");
+    } else if (mode == MODE_REFLOW) {
+      if (command.equalsIgnoreCase("stop")) {
+        return CMD_REFLOW_STOP;
+      }
+    }
+    
+    if (command.equalsIgnoreCase("status")) {
+      if (mode == MODE_MAIN_MENU) {
+        Serial.println("Mode: main menu");
+      } else if (mode == MODE_REFLOW) {
+        Serial.println("Mode: reflow");        
+      }
+      Serial.print("Current thermocouple reading (C): ");
+      Serial.println(readThermocouple());
+      
+      Serial.println();
+      
+      Serial.println("Configuration: ");
+      Serial.print("Soak Temperature: ");
       Serial.println(data[0]);
-      //TODO range checking
-    } else if (command.startsWith("setsd ")) {
-      setData(1,(byte)arguments.toInt());
-      Serial.print("Set soak duration: ");
+      
+      Serial.print("Soak Duration: ");
       Serial.println(data[1]);
-    } else if (command.startsWith("setpt ")) {
-      setData(2,(byte)arguments.toInt());
-      Serial.print("Set peak temperature: ");
+      
+      Serial.print("Peak Temperature: ");
       Serial.println(data[2]);
     }
-//      Serial.write("relay command!\n");
-//      Serial.write("arguments:");
-//      Serial.print(arguments);
-//      Serial.write("\n");
   }
 }
 
@@ -141,7 +173,11 @@ byte displayMenu(char * options[], int len, int defaultChoice) {
   int menuIndex = -1;
   setEnc(defaultChoice);
   while(1) {
-    processCommands();
+    int command = processCommands(MODE_MAIN_MENU);
+    if (command == CMD_REFLOW_START) {
+      Serial.println("Reflow started");
+      return menuSize-1; //start
+    }
     
     if (debounceButton(ENC_BUTTON)) {
       display.clear();
@@ -314,6 +350,13 @@ byte doReflow() {
     if ((millis() - lastReport) > 1000) {  //generate a 1000ms event period
       Serial.println(temp);
       lastReport += 1000;
+    }
+    
+    int command = processCommands(MODE_REFLOW);
+    if (command == CMD_REFLOW_STOP) {
+        Serial.println("Reflow cancelled");
+        relayOff();
+        return -1;
     }
     
     if (buttonStartTime == 0) {
