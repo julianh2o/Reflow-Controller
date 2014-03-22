@@ -152,20 +152,32 @@ int chooseNum(int low, int high, int defaultVal) {
 }
 
 byte editSetting(byte index) {
+<<<<<<< HEAD
+=======
+  Serial.println("EEPROM Write");
+  Serial.println(index);
+  Serial.println(data[index]);
+>>>>>>> b25adc26b9ca82c208d88877be4cff95bd6d3022
   data[index] = chooseNum(0,255,data[index]);
   EEPROM.write(index,data[index]);
 }
 
 void monitorTemp() {
+  unsigned long lastReport = millis();
   while(1) {
+    
     double temp = readThermocouple();
-    Serial.println(temp);
     display.display((int)temp);
+
+    if ((millis() - lastReport) > 100) {  //generate a 100ms event period
+      Serial.println(temp);
+      lastReport += 100;
+    }
     
     if (debounceButton(ENC_BUTTON)) return;
     if (debounceButton(BACK_BUTTON)) return;
-    
-    delay(100);
+
+    delay(10);
   } 
 }
 
@@ -184,12 +196,14 @@ byte mainMenu() {
 
 void ovenOn() {
   digitalWrite(RELAY,HIGH);
+  Serial.println("Relay ON");
 //  strip.setPixelColor(0, strip.Color(10,10,10));
 //  strip.show();
 }
 
 void ovenOff() {
   digitalWrite(RELAY,LOW);
+  Serial.println("Relay OFF");
 //  strip.setPixelColor(0, strip.Color(0,0,0));
 //  strip.show();
 }
@@ -219,7 +233,7 @@ void loop() {
   } else {
     display.displayMarquee("cancelled");    
   }
-  delay(5000);
+  delay(3500);
 }
 
 #define PHASE_PRE_SOAK 0
@@ -233,6 +247,7 @@ byte doReflow() {
   unsigned long startTime = millis();
   unsigned long phaseStartTime = millis();
   unsigned long buttonStartTime = 0;
+  unsigned long lastReport = millis();
   int phase = PHASE_PRE_SOAK;
   
   byte soakTemp = data[0];
@@ -243,6 +258,12 @@ byte doReflow() {
   ovenOn();
   while(1) {
     double temp = readThermocouple();
+    
+    if ((millis() - lastReport) > 1000) {  //generate a 1000ms event period
+      Serial.println(temp);
+      lastReport += 1000;
+    }
+    
     if (buttonStartTime == 0) {
       display.display((int)temp);
       if (buttonDown(BACK_BUTTON)) {
