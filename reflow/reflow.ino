@@ -48,6 +48,8 @@ void setup() {
   TIMSK1 |= (1 << TOIE1);   // enable timer overflow interrupt
   interrupts();
   
+  hardwareTest();
+  
   loadData();
 }
 
@@ -56,6 +58,17 @@ ISR(TIMER1_OVF_vect) {
   TCNT1 = 65500;
   
   display.tick();
+}
+
+void hardwareTest() {
+  int i,l;
+  byte testSegments[8] = {0b00000010,0b01000000,0b00100000,0b00010000,0b00001000,0b00000100,0b00000001,0b10000000};
+  for (l=0; l<8; l++) {
+    for (i=0; i<3; i++) {
+      display.setSegment(testSegments[l],i);
+    }
+    delay(100);
+  }
 }
 
 void setEnc(int val) {
@@ -106,13 +119,6 @@ byte displayMenu(char * options[], int len, int defaultChoice) {
     }
     
     if (newIndex != menuIndex) {
-      Serial.print("update!: ");
-      Serial.print(data[0]);
-      Serial.print(", ");
-      Serial.print(data[1]);
-      Serial.print(", ");
-      Serial.print(data[2]);
-      Serial.print("\n");
       menuIndex = newIndex;
       display.displayMarquee(options[menuIndex]);
     }
@@ -146,8 +152,6 @@ int chooseNum(int low, int high, int defaultVal) {
 }
 
 byte editSetting(byte index) {
-  Serial.println(index);
-  Serial.println(data[index]);
   data[index] = chooseNum(0,255,data[index]);
   EEPROM.write(index,data[index]);
 }

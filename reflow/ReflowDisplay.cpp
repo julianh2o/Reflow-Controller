@@ -118,6 +118,10 @@ void ReflowDisplay::displayChars(char * chars, int len) {
   displayedDigits[2] = len > 2 ? getLetter(chars[2]) : 0;
 }
 
+void ReflowDisplay::setSegment(byte segment, byte index) {
+  displayedDigits[index] = segment;
+}
+
 void ReflowDisplay::tick() {
   if (tickCounter % 200 == 0) {
     marqueeHandler();

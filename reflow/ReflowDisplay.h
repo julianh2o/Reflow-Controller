@@ -9,6 +9,7 @@ public:
 //  void display(string s);
   void display(char * s);
   void displayMarquee(char * chars);
+  void setSegment(byte segment, byte index);
   void tick();
   void clear();
   
