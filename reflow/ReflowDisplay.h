@@ -1,5 +1,7 @@
+#ifndef ReflowDisplay_h
+#define ReflowDisplay_h
+
 #include <arduino.h>
-/////#define byte uint8_t
 
 class ReflowDisplay {
 public:
@@ -41,3 +43,5 @@ private:
   static byte numerals[];
   static byte alphabet[];
 };
+
+#endif
