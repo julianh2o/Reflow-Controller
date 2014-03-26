@@ -24,26 +24,22 @@ set profile
 monitor
 */
 
+Reflowster reflowster;
+
 struct profile {
-  byte soakTemperature;
-  byte soakDuration;
-  byte peakTemperature;
+  byte soakTemp;
+  byte soakTime;
+  byte peakTemp;
 };
 
-
-
-#define DEFAULT_SOAK_TEMP 100
-#define DEFAULT_SOAK_TIME 90
-#define DEFAULT_PEAK_TEMP 190
+profile leaded, unleaded, custom;
+byte activeProfile;
 
 const int CMD_REFLOW_START=1;
 const int CMD_REFLOW_STOP=2;
 
 const int MODE_MAIN_MENU=1;
 const int MODE_REFLOW=2;
-
-int dsize = 3;
-byte data[3] = {0,0,0};
 
 void setup() {
   Serial.begin(9600);
@@ -60,7 +56,7 @@ void setup() {
   TIMSK1 |= (1 << TOIE1);   // enable timer overflow interrupt
   interrupts();
   
-  loadData();
+  loadProfiles();
 }
 
 ISR(TIMER1_OVF_vect) {
@@ -72,12 +68,14 @@ ISR(TIMER1_OVF_vect) {
 byte debounceButton(int b) {
   if (!digitalRead(b)) {
     while(!digitalRead(b));
+    delay(100);
     return 1;
   }
   return 0;
 }
 
 int processCommands(int mode) {
+/*
   char buffer[30];
   char i = 0;
   while (Serial.available()) {
@@ -145,6 +143,7 @@ int processCommands(int mode) {
       Serial.println(data[2]);
     }
   }
+*/
 }
 
 byte displayMenu(char * options[], int len, int defaultChoice) {
@@ -154,17 +153,17 @@ byte displayMenu(char * options[], int len, int defaultChoice) {
     int command = processCommands(MODE_MAIN_MENU);
     if (command == CMD_REFLOW_START) {
       Serial.println("Reflow started");
-      return menuSize-1; //start
+      return len-1; //start
     }
     
     if (debounceButton(reflowster.pinConfiguration_encoderButton)) {
       reflowster.getDisplay()->clear();
       return menuIndex;
     }
-//    if (debounceButton(reflowster.pinConfiguration_backButton)) {
-//      reflowster.getDisplay()->clear();
-//      return -1;
-//    }
+    if (debounceButton(reflowster.pinConfiguration_backButton)) {
+      reflowster.getDisplay()->clear();
+      return -1;
+    }
     
     int newIndex = reflowster.getKnobPosition();
     
@@ -211,47 +210,90 @@ int chooseNum(int low, int high, int defaultVal) {
   }
 }
 
-byte editSetting(byte index) {
-  setData(index,chooseNum(0,255,data[index]));
+void loadProfiles() {
+  leaded.soakTemp = 100;
+  leaded.soakTime = 90;
+  leaded.peakTemp = 190;
+  
+  unleaded.soakTemp = 100;
+  unleaded.soakTime = 90;
+  unleaded.peakTemp = 190;
+
+  custom.soakTemp = leaded.soakTemp;
+  custom.soakTime = leaded.soakTime;
+  custom.peakTemp = custom.peakTemp;
+  
+  activeProfile = EEPROM.read(0); //read the selected profile
+  if (activeProfile > 2) activeProfile = 0;
+
+  loadProfile(1,&custom); //use the leaded profile as the default
+
+  //Serial.println("custom");
+  //Serial.println(custom.soakTemp);
+  //Serial.println(custom.soakTime);
+  //Serial.println(custom.peakTemp);
 }
 
-void setData(byte index, byte value) {
-  data[index] = value;
-  EEPROM.write(index,data[index]); 
-}
-
-#define DEFAULT_SOAK_TEMP 100
-#define DEFAULT_SOAK_TIME 90
-#define DEFAULT_PEAK_TEMP 190
-void loadData() {
+void loadProfile(byte loc, struct profile * target) {
   for (byte i=0; i<3; i++) {
-    data[i] = EEPROM.read(i);
+    byte val = EEPROM.read(loc+i);
+    if (val != 255) *(((byte*)target)+i) = val; //pointer-fu to populate the profile struct
   }
-  if (data[0] == 255) data[0] = DEFAULT_SOAK_TEMP;
-  if (data[1] == 255) data[1] = DEFAULT_SOAK_TIME;
-  if (data[2] == 255) data[2] = DEFAULT_PEAK_TEMP;
+}
+
+void setActiveProfile(byte p) {
+  activeProfile = p;
+  if (EEPROM.read(0) != activeProfile) ewrite(0,activeProfile);
+}
+
+void saveProfile(byte loc, struct profile * target) {
+  for (byte i=0; i<3; i++) {
+    byte val = EEPROM.read(loc+i);
+    if (val != *(((byte*)target)+i)) ewrite(loc+i,*(((byte*)target)+i)); //we only write to eeprom if the value is changed
+  }
+}
+
+void ewrite(byte loc, byte val) {
+  /*
+  Serial.print("EEPROM WRITE ");
+  Serial.print(val);
+  Serial.print(" to ");
+  Serial.println(loc);
+  */
+  EEPROM.write(loc,val);
 }
 
 void loop() { 
   mainMenu();
 }
 
+char * mainMenuItems[] = {"go","set profile","monitor"};
 void mainMenu() {
   int choice = 0;
   while(1) {
-    choice = displayMenu({"go","set profile","monitor"},3,choice);
+    choice = displayMenu(mainMenuItems,3,choice);
     switch(choice) {
       case 0: doReflow(); break;
+
       case 1: 
         if (setProfile()) choice = 0;
       break;
+
       case 2: doMonitor(); break;
     }
   }
 }
 
 void doReflow() {
-  if (reflowImpl() == 0) {  
+  struct profile * active = &leaded;
+  if (activeProfile == 1) active = &unleaded;
+  if (activeProfile == 2) active = &custom;
+
+  byte soakTemp = active->soakTemp;
+  byte soakTime = active->soakTime;
+  byte peakTemp = active->peakTemp;
+
+  if (reflowImpl(soakTemp,soakTime,peakTemp) == 0) {  
     reflowster.getDisplay()->displayMarquee("done");
   } else {
     reflowster.getDisplay()->displayMarquee("cancelled");    
@@ -259,15 +301,50 @@ void doReflow() {
   delay(3500);
 }
 
+char * profileMenuItems[] = {"+pb leaded","-pb unleaded","custom"};
 boolean setProfile() {
   int choice = 0;
+  choice = displayMenu(profileMenuItems,3,choice);
+  switch(choice) {
+    case -1: return false;
+    case 0:
+      setActiveProfile(choice);
+      return true;
+    break;
+
+    case 1:
+      setActiveProfile(choice);
+      return true;
+    break;
+
+    case 2:
+      if (editCustomProfile()) {
+        setActiveProfile(choice);
+        return true;
+      }
+    break;
+  }
+}
+
+char * editProfileMenuItems[] = {"st-soak temp","sd-soak duration","pt-peak temp","set"};
+boolean editCustomProfile() {
+  int choice = 0;
+  byte val;
   while(1) {
-    choice = displayMenu({"+pb leaded","-pb unleaded","custom"},3,choice);
+    choice = displayMenu(editProfileMenuItems,4,choice);
     switch(choice) {
       case -1: return false;
-      case 0: doReflow(); break;
-      case 1: setProfile(); break;
-      case 2: doMonitor(); break;
+      case 0:
+      case 1:
+      case 2:
+        val = *(((byte*)&custom)+choice);
+        *(((byte*)&custom)+choice) = chooseNum(0,255,val);
+
+        saveProfile(1,&custom);
+      break;
+
+      case 3:
+        return true;
     }
   }
 }
@@ -296,16 +373,21 @@ void doMonitor() {
 #define PHASE_SPIKE 2
 #define PHASE_COOL 3
 #define CANCEL_TIME 5000
-byte reflowImpl() {
+byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   unsigned long startTime = millis();
   unsigned long phaseStartTime = millis();
   unsigned long buttonStartTime = 0;
   unsigned long lastReport = millis();
   int phase = PHASE_PRE_SOAK;
+
+  Serial.println("Starting Reflow: ");
+  Serial.print("Soak Temp: ");
+  Serial.println(soakTemp);
+  Serial.print("Soak Time: ");
+  Serial.println(soakTime);
+  Serial.print("Peak Temp: ");
+  Serial.println(peakTemp);
   
-  byte soakTemp = data[0];
-  byte soakTime = data[1];
-  byte peakTemp = data[2];
   reflowster.setKnobPosition(25); //TODO remove me for production
   
   reflowster.relayOn();
