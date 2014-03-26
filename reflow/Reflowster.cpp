@@ -59,7 +59,7 @@ void Reflowster::displayTest() {
     for (i=0; i<3; i++) {
       display->setSegment(testSegments[l],i);
     }
-    delay(100);
+    delay(50);
   }
 }
 

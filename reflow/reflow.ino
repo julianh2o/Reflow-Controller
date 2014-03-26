@@ -7,9 +7,6 @@
 #include <Time.h>
 #include <EEPROM.h>
 #include "Reflowster.h"
-#include "ReflowMenu.h"
-#include "ReflowMenuItem.h"
-#include "ReflowMenuEndpoint.h"
 
 /*
 go
@@ -27,25 +24,34 @@ monitor
 Reflowster reflowster;
 
 struct profile {
+  profile() : soakTemp(), soakTime(), peakTemp() {}
+  profile(int stp, int sti, int ptp) : soakTemp( stp ), soakTime( sti ), peakTemp( ptp ) {} 
   byte soakTemp;
   byte soakTime;
   byte peakTemp;
 };
 
+profile profile_min(0,0,0);
+profile profile_max(250,250,250);
+
 profile leaded, unleaded, custom;
 byte activeProfile;
 
+int activeCommand = 0;
+// This represents the currently active command. When a command is received, this is triggered and the busy loops handle
+// adjusting the state to execute the command
 const int CMD_REFLOW_START=1;
 const int CMD_REFLOW_STOP=2;
 
-const int MODE_MAIN_MENU=1;
-const int MODE_REFLOW=2;
+// This represents the current state that the reflowster is in, it is used by the command processing framework
+// It should be considered read only in most cases
+int activeMode = 0;
+const int MODE_REFLOW=1;
+const int MODE_MENU=2;
 
 void setup() {
   Serial.begin(9600);
 
-  reflowster.init();
-  reflowster.displayTest();
   
   noInterrupts();
   TCCR1A = 0;
@@ -56,6 +62,8 @@ void setup() {
   TIMSK1 |= (1 << TOIE1);   // enable timer overflow interrupt
   interrupts();
   
+  reflowster.init();
+  reflowster.displayTest();
   loadProfiles();
 }
 
@@ -63,6 +71,7 @@ ISR(TIMER1_OVF_vect) {
   TCNT1 = 65500;
   
   reflowster.tick();
+  processCommands();
 }
 
 byte debounceButton(int b) {
@@ -74,9 +83,9 @@ byte debounceButton(int b) {
   return 0;
 }
 
-int processCommands(int mode) {
-/*
+void processCommands() {
   char buffer[30];
+  boolean recognized = false;
   char i = 0;
   while (Serial.available()) {
     buffer[i++] = Serial.read();
@@ -90,72 +99,110 @@ int processCommands(int mode) {
     Serial.write("> ");
     Serial.write(buffer);
     Serial.write("\n");
-    if (mode == MODE_MAIN_MENU) {
+    if (activeMode == MODE_MENU) {
       if (command.startsWith("relay ")) {
         if (arguments.equalsIgnoreCase("on")) {
+          recognized = true;
           reflowster.relayOn();
         } else if (arguments.equalsIgnoreCase("off")) {
+          recognized = true;
           reflowster.relayOff();        
         } else if (arguments.equalsIgnoreCase("toggle")) {
+          recognized = true;
           reflowster.relayToggle();
         }
       } else if (command.startsWith("setst ")) {
-        setData(0,(byte)arguments.toInt());
-        Serial.print("Set soak temperature: ");
-        Serial.println(data[0]);
-        //TODO range checking
+        //TODO dedup this code by taking advantage of the indexing in a soldering profile struct
+        recognized = true;
+        int val = arguments.toInt();
+        if (val < profile_min.soakTemp || val > profile_max.soakTemp) {
+          Serial.println("Temperature out of range!");
+        } else {
+          custom.soakTemp = (byte)val;
+          saveProfile(1, &custom);
+          Serial.print("Set soak temperature: ");
+          Serial.println(custom.soakTemp);
+        }
       } else if (command.startsWith("setsd ")) {
-        setData(1,(byte)arguments.toInt());
-        Serial.print("Set soak duration: ");
-        Serial.println(data[1]);
+        recognized = true;
+        int val = arguments.toInt();
+        if (val < profile_min.soakTime || val > profile_max.soakTime) {
+          Serial.println("Time out of range!");
+        } else {
+          custom.soakTime = (byte)val;
+          saveProfile(1, &custom);
+          Serial.print("Set soak time: ");
+          Serial.println(custom.soakTime);
+        }
       } else if (command.startsWith("setpt ")) {
-        setData(2,(byte)arguments.toInt());
-        Serial.print("Set peak temperature: ");
-        Serial.println(data[2]);
+        recognized = true;
+        int val = arguments.toInt();
+        if (val < profile_min.peakTemp || val > profile_max.peakTemp) {
+          Serial.println("Temperature out of range!");
+        } else {
+          custom.peakTemp = (byte)val;
+          saveProfile(1, &custom);
+          Serial.print("Set peak temp: ");
+          Serial.println(custom.peakTemp);
+        }
       } else if (command.equalsIgnoreCase("start")) {
-        return CMD_REFLOW_START;
+        recognized = true;
+        activeCommand = CMD_REFLOW_START;
       }
-    } else if (mode == MODE_REFLOW) {
+    } else if (activeMode == MODE_REFLOW) {
       if (command.equalsIgnoreCase("stop")) {
-        return CMD_REFLOW_STOP;
+        recognized = true;
+        activeCommand = CMD_REFLOW_STOP;
       }
     }
     
     if (command.equalsIgnoreCase("status")) {
-      if (mode == MODE_MAIN_MENU) {
-        Serial.println("Mode: main menu");
-      } else if (mode == MODE_REFLOW) {
-        Serial.println("Mode: reflow");        
+      recognized = true;
+      if (activeMode == MODE_MENU) {
+        Serial.println("Status: menus");
+      } else if (activeMode == MODE_REFLOW) {
+        Serial.println("Status: reflow in progress");        
       }
       Serial.print("Current thermocouple reading (C): ");
       Serial.println(reflowster.readThermocouple());
       
       Serial.println();
       
-      Serial.println("Configuration: ");
+
+      struct profile * active = &leaded;
+      if (activeProfile == 1) active = &unleaded;
+      if (activeProfile == 2) active = &custom;
+
+      if (active == &leaded) Serial.println("Configuration: leaded");
+      if (active == &unleaded) Serial.println("Configuration: unleaded");
+      if (active == &custom) Serial.println("Configuration: custom");
       Serial.print("Soak Temperature: ");
-      Serial.println(data[0]);
+      Serial.println(active->soakTemp);
       
-      Serial.print("Soak Duration: ");
-      Serial.println(data[1]);
+      Serial.print("Soak Time: ");
+      Serial.println(active->soakTime);
       
       Serial.print("Peak Temperature: ");
-      Serial.println(data[2]);
+      Serial.println(active->peakTemp);
+    } else if (command.equalsIgnoreCase("help")) {
+      Serial.println("Reflowster accepts the following commands in normal mode:");
+      Serial.println("relay on|off|toggle, setst deg_c, setsd time_s, setpt deg_c, start, status, help");
+      Serial.println();
+      Serial.println("Reflowster accepts the following commands during a reflow:");
+      Serial.println("stop, status, help");
+    }
+    if (recognized == false) {
+      Serial.println("Unrecognized or invalid command!");
     }
   }
-*/
 }
 
 byte displayMenu(char * options[], int len, int defaultChoice) {
+  activeMode = MODE_MENU;
   int menuIndex = -1;
   reflowster.setKnobPosition(defaultChoice);
   while(1) {
-    int command = processCommands(MODE_MAIN_MENU);
-    if (command == CMD_REFLOW_START) {
-      Serial.println("Reflow started");
-      return len-1; //start
-    }
-    
+    if (activeCommand != 0) return -1;
     if (debounceButton(reflowster.pinConfiguration_encoderButton)) {
       reflowster.getDisplay()->clear();
       return menuIndex;
@@ -269,9 +316,13 @@ void loop() {
 
 char * mainMenuItems[] = {"go","set profile","monitor"};
 void mainMenu() {
-  int choice = 0;
+  byte lastChoice = 0;
   while(1) {
-    choice = displayMenu(mainMenuItems,3,choice);
+    if (activeCommand == CMD_REFLOW_START) {
+      doReflow();
+    }
+    byte choice = displayMenu(mainMenuItems,3,lastChoice);
+    if (choice != -1) lastChoice = choice;
     switch(choice) {
       case 0: doReflow(); break;
 
@@ -285,6 +336,12 @@ void mainMenu() {
 }
 
 void doReflow() {
+  if (isnan(reflowster.readThermocouple())) {
+    reflowster.getDisplay()->displayMarquee("err no temp");
+    Seria.println("Error: Thermocouple could not be read, check connection!");
+    while(!reflowster.getDisplay()->marqueeComplete());
+    return;
+  }
   struct profile * active = &leaded;
   if (activeProfile == 1) active = &unleaded;
   if (activeProfile == 2) active = &custom;
@@ -293,18 +350,18 @@ void doReflow() {
   byte soakTime = active->soakTime;
   byte peakTemp = active->peakTemp;
 
+  activeMode = MODE_REFLOW;
   if (reflowImpl(soakTemp,soakTime,peakTemp) == 0) {  
     reflowster.getDisplay()->displayMarquee("done");
   } else {
     reflowster.getDisplay()->displayMarquee("cancelled");    
   }
-  delay(3500);
+  while(!reflowster.getDisplay()->marqueeComplete());
 }
 
 char * profileMenuItems[] = {"+pb leaded","-pb unleaded","custom"};
 boolean setProfile() {
-  int choice = 0;
-  choice = displayMenu(profileMenuItems,3,choice);
+  byte choice = displayMenu(profileMenuItems,3,choice);
   switch(choice) {
     case -1: return false;
     case 0:
@@ -399,9 +456,9 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       lastReport += 1000;
     }
     
-    int command = processCommands(MODE_REFLOW);
-    if (command == CMD_REFLOW_STOP) {
+    if (activeCommand == CMD_REFLOW_STOP) {
         Serial.println("Reflow cancelled");
+        activeCommand = 0;
         reflowster.relayOff();
         return -1;
     }

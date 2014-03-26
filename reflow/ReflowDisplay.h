@@ -11,6 +11,7 @@ public:
 //  void display(string s);
   void display(char * s);
   void displayMarquee(char * chars);
+  boolean marqueeComplete();
   void setSegment(byte segment, byte index);
   void tick();
   void clear();
@@ -21,6 +22,7 @@ private:
   char * marqueeString;
   int marqueeLength;
   int marqueeIndex;
+  boolean marqueeCompleteFlag;
   
   byte getLetter(char a);
   void displayChars(char * chars, int len);

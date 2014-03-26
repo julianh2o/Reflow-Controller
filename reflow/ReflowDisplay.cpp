@@ -56,6 +56,7 @@ ReflowDisplay::ReflowDisplay() {
   marqueeString = "\0";
   marqueeLength = 0;
   marqueeIndex = 0;
+  marqueeCompleteFlag = false;
 }
 
 void ReflowDisplay::display(int n) {
@@ -77,9 +78,13 @@ void ReflowDisplay::display(char * s) {
   displayChars(s,len);
 }
 
+boolean ReflowDisplay::marqueeComplete() {
+  return marqueeCompleteFlag;
+}
+
 void ReflowDisplay::displayMarquee(char * chars) {
   marqueeIndex = -MARQUEE_START_WAIT;
-  //marqueeIndex = 0;
+  marqueeCompleteFlag = false;
   marqueeString = chars;
   marqueeLength = strlen(chars);
   displayChars(marqueeString,3);
@@ -104,8 +109,11 @@ void ReflowDisplay::marqueeHandler() {
    }
   
   if (marqueeLength > 3) marqueeIndex++;  //no scrolling unless the string is more than 3 chars long
-//  if (marqueeIndex >= marqueeLength) marqueeIndex = 0;
-  if (marqueeIndex >= marqueeLength-3+MARQUEE_END_WAIT+1) marqueeIndex = -MARQUEE_START_WAIT;
+  if (marqueeIndex >= marqueeLength-3+MARQUEE_END_WAIT+1) {
+    //marquee has wrapped.. we consider it complete now
+    marqueeCompleteFlag = true;
+    marqueeIndex = -MARQUEE_START_WAIT;
+  }
 }
 
 void ReflowDisplay::stopMarquee() {
