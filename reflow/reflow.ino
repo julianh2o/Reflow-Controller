@@ -74,6 +74,41 @@ ISR(TIMER1_OVF_vect) {
   processCommands();
 }
 
+void ledTest() {
+  char rainbow[375] = {0,25,0,1,25,0,2,25,0,3,25,0,4,25,0,6,25,0,7,25,0,8,25,0,9,25,0,11,25,0,12,25,0,13,25,0,14,25,0,15,25,0,17,25,0,18,25,0,19,25,0,20,25,0,22,25,0,23,25,0,24,25,0,25,25,0,25,24,0,25,22,0,25,21,0,25,20,0,25,19,0,25,17,0,25,16,0,25,15,0,25,14,0,25,13,0,25,11,0,25,10,0,25,9,0,25,8,0,25,6,0,25,5,0,25,4,0,25,3,0,25,2,0,25,0,0,25,0,0,25,0,1,25,0,2,25,0,4,25,0,5,25,0,6,25,0,7,25,0,8,25,0,10,25,0,11,25,0,12,25,0,13,25,0,15,25,0,16,25,0,17,25,0,18,25,0,19,25,0,21,25,0,22,25,0,23,25,0,24,24,0,25,23,0,25,22,0,25,21,0,25,19,0,25,18,0,25,17,0,25,16,0,25,15,0,25,13,0,25,12,0,25,11,0,25,10,0,25,8,0,25,7,0,25,6,0,25,5,0,25,4,0,25,2,0,25,1,0,25,0,0,25,0,0,25,0,2,25,0,3,25,0,4,25,0,5,25,0,6,25,0,8,25,0,9,25,0,10,25,0,11,25,0,13,25,0,14,25,0,15,25,0,16,25,0,17,25,0,19,25,0,20,25,0,21,25,0,22,25,0,24,25,0,25,25,0,25,24,0,25,23,0,25,22,0,25,20,0,25,19,0,25,18,0,25,17,0,25,15,0,25,14,0,25,13,0,25,12,0,25,11,0,25,9,0,25,8,0,25,7,0,25,6,0,25,4,0,25,3,0,25,2,0,25,1};
+  
+  while(1) {
+    for (int i=0; i<125; i++) {
+      reflowster.setStatusColor(rainbow[i*3],rainbow[i*3+1],rainbow[i*3+2]);
+      delay(20);
+    }
+    for (int a=0; a<3; a++) {
+      for (int l=0; l<2; l++) {
+        for (int i=5; i<30; i++) {
+          reflowster.setStatusColor(a==0?i:0,a==1?i:0,a==2?i:0);
+          delay(10);
+        }
+        for (int i=30; i>5; i--) {
+          reflowster.setStatusColor(a==0?i:0,a==1?i:0,a==2?i:0);
+          delay(10);
+        }
+      }
+    }
+    int v = 50;
+    for (int a=0; a<3; a++) {
+      for (int i=0; i<5; i++) {
+        reflowster.setStatusColor(a==0?v:0,a==1?v:0,a==2?v:0);
+        delay(50);
+        reflowster.setStatusColor(0,0,0);
+        delay(100);
+      }
+      delay(300);
+    }
+    reflowster.setStatusColor(10,10,10);
+    delay(2000);
+  } 
+}
+
 byte debounceButton(int b) {
   if (!digitalRead(b)) {
     while(!digitalRead(b));
@@ -319,6 +354,7 @@ void mainMenu() {
   byte lastChoice = 0;
   while(1) {
     if (activeCommand == CMD_REFLOW_START) {
+      activeCommand = 0;
       doReflow();
     }
     byte choice = displayMenu(mainMenuItems,3,lastChoice);
@@ -335,10 +371,60 @@ void mainMenu() {
   }
 }
 
+void dataCollectionMode() {
+  double goalTemp = 80;
+  unsigned long lastReport = millis();
+  
+  unsigned long lastCycleStart = millis();
+  float ratio = .1;
+  int timeUnit = 30000;
+  
+  long REPORT_FREQUENCY = 5000;
+  while(1) {
+    double temp = reflowster.readThermocouple();
+    if ((millis() - lastReport) > REPORT_FREQUENCY) {
+      Serial.print("data: ");
+      Serial.print(temp);
+      Serial.print(" ");
+      Serial.println(reflowster.relayStatus());
+      lastReport += REPORT_FREQUENCY;
+    }
+    
+    long current = millis();
+    long cycleDuration = current - lastCycleStart;
+    if (current > lastCycleStart+timeUnit) {
+      lastCycleStart += timeUnit;
+      cycleDuration = 0;
+    } 
+    double cratio = (double)cycleDuration/(double)timeUnit;
+    boolean on = cratio < ratio;
+    if (temp < 88) on = true;
+//    Serial.print("cycleDuration: ");
+//    Serial.println(cycleDuration);
+//    Serial.print("cratio: ");
+//    Serial.println(cratio);
+    if (reflowster.relayStatus() && !on) {
+      reflowster.relayOff();
+    } else if (!reflowster.relayStatus() && on) {
+      reflowster.relayOn();        
+    }
+    
+    if (reflowster.getBackButton()) {
+       while(reflowster.getBackButton());
+       delay(1000);
+       return; 
+    }
+    
+    delay(300);
+  }
+}
+
 void doReflow() {
+//  dataCollectionMode();
+//  return;
   if (isnan(reflowster.readThermocouple())) {
     reflowster.getDisplay()->displayMarquee("err no temp");
-    Seria.println("Error: Thermocouple could not be read, check connection!");
+    Serial.println("Error: Thermocouple could not be read, check connection!");
     while(!reflowster.getDisplay()->marqueeComplete());
     return;
   }
@@ -408,20 +494,21 @@ boolean editCustomProfile() {
 
 void doMonitor() {
   unsigned long lastReport = millis();
+  int MONITOR_FREQUENCY = 1000;
   while(1) {
     
     double temp = reflowster.readThermocouple();
     reflowster.getDisplay()->display((int)temp);
 
-    if ((millis() - lastReport) > 1000) {  //generate a 1000ms event period
+    if ((millis() - lastReport) > MONITOR_FREQUENCY) {  //generate a 1000ms event period
       Serial.println(temp);
-      lastReport += 100;
+      lastReport += MONITOR_FREQUENCY;
     }
     
     if (debounceButton(reflowster.pinConfiguration_encoderButton)) return;
     if (debounceButton(reflowster.pinConfiguration_backButton)) return;
 
-    delay(10);
+    delay(50);
   } 
 }
 
@@ -445,15 +532,19 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   Serial.print("Peak Temp: ");
   Serial.println(peakTemp);
   
-  reflowster.setKnobPosition(25); //TODO remove me for production
+  int REPORT_INTERVAL = 200;
   
   reflowster.relayOn();
   while(1) {
+    delay(50);
     double temp = reflowster.readThermocouple();
     
-    if ((millis() - lastReport) > 1000) {  //generate a 1000ms event period
-      Serial.println(temp);
-      lastReport += 1000;
+    if ((millis() - lastReport) > REPORT_INTERVAL) {  //generate a 1000ms event period
+      Serial.print("data: ");
+      Serial.print(temp);
+      Serial.print(" ");
+      Serial.println(reflowster.relayStatus());
+      lastReport += REPORT_INTERVAL;
     }
     
     if (activeCommand == CMD_REFLOW_STOP) {
@@ -462,7 +553,6 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
         reflowster.relayOff();
         return -1;
     }
-    
     if (buttonStartTime == 0) {
       reflowster.getDisplay()->display((int)temp);
       if (reflowster.getBackButton()) {
@@ -507,7 +597,8 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       
       case PHASE_COOL: {
         unsigned long currentCoolSeconds = (millis() - phaseStartTime) / 1000;
-        if (currentCoolSeconds > 30 || temp < 60 || debounceButton(reflowster.pinConfiguration_backButton) || debounceButton(reflowster.pinConfiguration_encoderButton)) {
+        if (debounceButton(reflowster.pinConfiguration_backButton) || debounceButton(reflowster.pinConfiguration_encoderButton)) {
+//        if (currentCoolSeconds > 30 || temp < 60 || debounceButton(reflowster.pinConfiguration_backButton) || debounceButton(reflowster.pinConfiguration_encoderButton)) {
           reflowster.relayOff();
           return 0;
         }

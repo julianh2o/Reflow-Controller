@@ -32,6 +32,7 @@ public:
   void relayOn();
   void relayOff();
   void relayToggle();
+  boolean relayStatus();
   
 private:
   Adafruit_NeoPixel * status;

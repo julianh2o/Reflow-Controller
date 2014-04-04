@@ -110,3 +110,7 @@ void Reflowster::relayToggle() {
     relayOn();    
   }
 }
+
+boolean Reflowster::relayStatus() {
+  return digitalRead(pinConfiguration_relay);
+}
