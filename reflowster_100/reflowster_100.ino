@@ -70,8 +70,8 @@ void setup() {
 ISR(TIMER1_OVF_vect) {
   TCNT1 = 65500;
   
-  reflowster.tick();
-  processCommands();
+//  reflowster.tick();
+//  processCommands();
 }
 
 void ledTest() {
