@@ -34,20 +34,24 @@ byte ReflowDisplay::alphabet[] = {
     0b01101101  //z
 };
 
-ReflowDisplay::ReflowDisplay() {
-  pinMode(DDP, OUTPUT);
-  pinMode(DA, OUTPUT);
-  pinMode(DB, OUTPUT);
-  //pinMode(DC, OUTPUT);
-  DDRE = DDRE | 0b00000100;
-  pinMode(DD, OUTPUT);
-  pinMode(DE, OUTPUT);
-  pinMode(DF, OUTPUT);
-  pinMode(DG, OUTPUT);
+int DS,STCP,SHCP,D1,D2,D3; //tODO protect these variables
+
+ReflowDisplay::ReflowDisplay(int cDS, int cSTCP, int cSHCP, int cD1, int cD2, int cD3) {
+  DS = cDS;
+  STCP = cSTCP;
+  SHCP = cSHCP;
+  D1 = cD1;
+  D2 = cD2;
+  D3 = cD3;
+  
+  pinMode(DS, OUTPUT);
+  pinMode(STCP, OUTPUT);
+  pinMode(SHCP, OUTPUT);
   
   pinMode(D3, OUTPUT);
   pinMode(D2, OUTPUT);
   pinMode(D1, OUTPUT);
+  pinMode(8, OUTPUT);
   
   tickCounter = 0;
   displayedDigits[0] = 0;
@@ -72,6 +76,8 @@ void ReflowDisplay::display(int n) {
 }
 
 void ReflowDisplay::display(char * s) {
+  Serial.println("display: ");
+  Serial.println(s);
   stopMarquee();
   byte len = strlen(s);
   if (len > 3) len = 3;
@@ -153,17 +159,33 @@ void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
   digitalWrite(D2,LOW);
   digitalWrite(D3,LOW);
   
-  digitalWrite(DDP,0b10000000 & segments ? LOW : HIGH);
-  digitalWrite(DA,0b01000000 & segments ? LOW : HIGH);
-  digitalWrite(DB,0b00100000 & segments ? LOW : HIGH);
-  //temporary hack while this pin is PE
-  //digitalWrite(DC,0b00010000 & val ? LOW : HIGH);
-  PORTE = (0b00010000 & segments) ? (PORTE & (~0b00000100)) : (PORTE | 0b00000100);
-  //end temporary hack
-  digitalWrite(DD,0b00001000 & segments ? LOW : HIGH);
-  digitalWrite(DE,0b00000100 & segments ? LOW : HIGH);
-  digitalWrite(DF,0b00000010 & segments ? LOW : HIGH);
-  digitalWrite(DG,0b00000001 & segments ? LOW : HIGH);
+//  Serial.println(segments,BIN);
+//  segments = 0b00000000;
+  //This is performing the pin mapping to account for the arbitrary order of the lettered display pins with the output pins of the shift register
+//  Serial.print("n = 0b");
+//  Serial.print(n,BIN);
+//  Serial.println();
+  unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
+                (0b01000000 & (segments << 3)) |
+                (0b00100000 & (segments << 1)) |
+                (0b00010000 & (segments << 2)) |
+                (0b00001000 & (segments << 2)) |
+                (0b00000100 & (segments >> 4)) |
+                (0b00000010 & (segments >> 4)) |
+                (0b00000001 & (segments << 0));
+                
+//  Serial.print("m = 0b");
+//  Serial.print(mapped,BIN);
+//  Serial.println();
+
+  digitalWrite(STCP, LOW);
+  for (char i=0; i<8; i++) {
+    digitalWrite(SHCP,LOW);
+    digitalWrite(DS,!(mapped&1));
+    digitalWrite(SHCP,HIGH);
+    mapped = mapped >> 1;
+  }
+  digitalWrite(STCP, HIGH);
   
   digitalWrite(D1,displayDigit == 0 ? HIGH : LOW);
   digitalWrite(D2,displayDigit == 1 ? HIGH : LOW);

@@ -10,6 +10,10 @@ int pinConfiguration_thermocoupleCS;
 int pinConfiguration_displayDS;
 int pinConfiguration_displaySTCP;
 int pinConfiguration_displaySHCP;
+int pinConfiguration_displayD1;
+int pinConfiguration_displayD2;
+int pinConfiguration_displayD3; //todo add display separator
+int pinConfiguration_displayDD;
 int pinConfiguration_beep;
 
 Reflowster::Reflowster() {
@@ -23,6 +27,10 @@ Reflowster::Reflowster() {
   pinConfiguration_displayDS = 5;
   pinConfiguration_displaySTCP = 13;
   pinConfiguration_displaySHCP = A0;
+  pinConfiguration_displayD1 = 6;
+  pinConfiguration_displayD2 = 9;
+  pinConfiguration_displayD3 = 10;
+  pinConfiguration_displayDD = 8;  
   pinConfiguration_beep = A5;
 }
 
@@ -30,7 +38,8 @@ void Reflowster::init() {
   status = new Adafruit_NeoPixel(1, pinConfiguration_statusLed, NEO_GRB + NEO_KHZ800);
 //  knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
 //  probe = new MAX31855(pinConfiguration_thermocoupleCS);
-  //display = new ReflowDisplay();
+
+  display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3);
   
   status->begin();
   status->show();
@@ -46,17 +55,7 @@ void Reflowster::init() {
   pinMode(pinConfiguration_displaySHCP, OUTPUT);
   pinMode(pinConfiguration_beep, OUTPUT);
   
-  pinMode(6,OUTPUT);
-  digitalWrite(6,HIGH);
-  
-  pinMode(9,OUTPUT);
-  digitalWrite(9,HIGH);
-  
-  pinMode(10,OUTPUT);
-  digitalWrite(10,HIGH);
-  
-  pinMode(8,OUTPUT); //separator
-  digitalWrite(8,HIGH);
+
   
   //Serial.begin(9600);
 
@@ -90,27 +89,26 @@ void Reflowster::init() {
 //  digitalWrite(pinConfiguration_displaySHCP,LOW);
 //  while(1);x
         
+//  display->display("abc");
+  byte a = 1;
   while(1) {
-    for (byte c=0; c<8; c++) {
-      unsigned char b = 1 << c;
-//      unsigned char b = 0xff;
-      Serial.println((unsigned char)b);
-      digitalWrite(pinConfiguration_displaySTCP, LOW);
-      for (char i=0; i<8; i++) {
-        digitalWrite(pinConfiguration_displaySHCP,LOW);
-        delay(10);
-        digitalWrite(pinConfiguration_displayDS,b&1);
-        delay(10);
-        Serial.print("  ");
-        Serial.println(b&1);
-        digitalWrite(pinConfiguration_displaySHCP,HIGH);
-        delay(10);
-        b = b >> 1;
-      }
-      digitalWrite(pinConfiguration_displaySTCP, HIGH);
-      delay(500);
-    }
-    delay(100); 
+//    delay(500);
+///    display->display("cde");
+    display->displayDigit(0b00000001,0);
+    delay(400);
+    display->displayDigit(0b00000010,0);
+    delay(400);
+    display->displayDigit(0b00000011,0);
+    delay(400);
+    display->displayDigit(0b00000000,0);
+    delay(400);
+    display->displayDigit(0b11111100,0);
+    delay(400);
+
+//    display->displayDigit(a,0);
+//    Serial.println(a);
+// display->tick();
+//    a = a << 1;
   }
   
   //setKnobPosition(50);
@@ -127,7 +125,7 @@ void Reflowster::init() {
 }
 
 void Reflowster::tick() {
-  display->tick();
+  //display->tick();
 }
 
 // Status
