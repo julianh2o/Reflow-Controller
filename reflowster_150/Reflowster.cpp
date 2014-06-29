@@ -95,7 +95,7 @@ void Reflowster::selfTest() {
   
   double temp;
   while(!getButton()) {
-    temp = readThermocouple();
+    temp = readCelsius();
     if (isnan(temp)) {
       display->display("err");
     } else {
@@ -165,8 +165,12 @@ int Reflowster::getKnobPosition() {
 
 // Thermocouple
 ///////////////
-double Reflowster::readThermocouple() {
+double Reflowster::readCelsius() {
   return probe->readCelsius();
+}
+
+double Reflowster::readFahrenheit() {
+  return probe->readFarenheit(); //note, tbe misspelling in the adafruit library
 }
 
 // Relay

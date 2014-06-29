@@ -75,8 +75,6 @@ void ReflowDisplay::display(int n) {
 }
 
 void ReflowDisplay::display(char * s) {
-  Serial.println("display: ");
-  Serial.println(s);
   stopMarquee();
   byte len = strlen(s);
   if (len > 3) len = 3;
@@ -92,7 +90,7 @@ void ReflowDisplay::displayMarquee(char * chars) {
   marqueeCompleteFlag = false;
   marqueeString = chars;
   marqueeLength = strlen(chars);
-  displayChars(marqueeString,3);
+  displayChars(marqueeString,marqueeLength <= 3 ? marqueeLength : 3);
 }
 
 void ReflowDisplay::clear() {
@@ -110,7 +108,7 @@ void ReflowDisplay::marqueeHandler() {
    } else if (marqueeIndex >= 0) { //this is the meat of the string and the scroll
      displayChars(marqueeString+marqueeIndex,3);
    } else if (marqueeIndex == -MARQUEE_START_WAIT) { //prior to scrolling, pause on the first 3 chars
-     displayChars(marqueeString,3);
+     displayChars(marqueeString,marqueeLength <= 3 ? marqueeLength : 3);
    }
   
   if (marqueeLength > 3) marqueeIndex++;  //no scrolling unless the string is more than 3 chars long

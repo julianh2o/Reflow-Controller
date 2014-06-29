@@ -51,7 +51,11 @@ const int MODE_MENU=2;
 
 const int CONFIG_LOCATION = 200;
 const int CONFIG_SELF_TEST = 0;
-const int CONFIG_SELF_UNITS = 1;
+const int CONFIG_TEMP_MODE = 1;
+
+const int TEMP_MODE_C = 0;
+const int TEMP_MODE_F = 1;
+const int DEFAULT_TEMP_MODE = TEMP_MODE_C;
 
 void setup() {
   Serial.begin(9600);
@@ -186,7 +190,7 @@ void processCommands() {
         Serial.println("Status: reflow in progress");        
       }
       Serial.print("Current thermocouple reading (C): ");
-      Serial.println(reflowster.readThermocouple());
+      Serial.println(reflowster.readCelsius());
       
       Serial.println();
       
@@ -219,7 +223,7 @@ void processCommands() {
   }
 }
 
-byte displayMenu(char * options[], int len, int defaultChoice) {
+int displayMenu(char * options[], int len, int defaultChoice) {
   activeMode = MODE_MENU;
   int menuIndex = -1;
   reflowster.setKnobPosition(defaultChoice);
@@ -339,7 +343,8 @@ void loop() {
   mainMenu();
 }
 
-char * mainMenuItems[] = {"go","set profile","monitor"};
+char * mainMenuItems[] = {"go","set profile","monitor","config"};
+const int MAIN_MENU_SIZE = 4;
 void mainMenu() {
   byte lastChoice = 0;
   while(1) {
@@ -347,7 +352,9 @@ void mainMenu() {
       activeCommand = 0;
       doReflow();
     }
-    byte choice = displayMenu(mainMenuItems,4,lastChoice);
+    int choice = displayMenu(mainMenuItems,MAIN_MENU_SIZE,lastChoice);
+    Serial.print("choice: ");
+    Serial.println(choice);
     if (choice != -1) lastChoice = choice;
     switch(choice) {
       case 0: doReflow(); break;
@@ -357,6 +364,8 @@ void mainMenu() {
       break;
 
       case 2: doMonitor(); break;
+      
+      case 3: configMenu(); break;
     }
   }
 }
@@ -371,7 +380,12 @@ void dataCollectionMode() {
   
   long REPORT_FREQUENCY = 5000;
   while(1) {
-    double temp = reflowster.readThermocouple();
+    double temp = 0;
+    if (readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_F) {
+      temp = reflowster.readFahrenheit();
+    } else {
+      temp = reflowster.readCelsius();
+    }
     if ((millis() - lastReport) > REPORT_FREQUENCY) {
       Serial.print("data: ");
       Serial.print(temp);
@@ -412,7 +426,7 @@ void dataCollectionMode() {
 void doReflow() {
 //  dataCollectionMode();
 //  return;
-  if (isnan(reflowster.readThermocouple())) {
+  if (isnan(reflowster.readCelsius())) {
     reflowster.getDisplay()->displayMarquee("err no temp");
     Serial.println("Error: Thermocouple could not be read, check connection!");
     while(!reflowster.getDisplay()->marqueeComplete());
@@ -437,32 +451,35 @@ void doReflow() {
 
 char * profileMenuItems[] = {"+pb leaded","-pb unleaded","custom"};
 boolean setProfile() {
-  byte choice = displayMenu(profileMenuItems,3,choice);
-  switch(choice) {
-    case -1: return false;
-    case 0:
-      setActiveProfile(choice);
-      return true;
-    break;
-
-    case 1:
-      setActiveProfile(choice);
-      return true;
-    break;
-
-    case 2:
-      if (editCustomProfile()) {
+  while(1) {
+    int choice = displayMenu(profileMenuItems,3,choice);
+    switch(choice) {
+      case -1: return false;
+      case 0:
         setActiveProfile(choice);
         return true;
-      }
-    break;
+      break;
+  
+      case 1:
+        setActiveProfile(choice);
+        return true;
+      break;
+  
+      case 2:
+        if (editCustomProfile()) {
+          setActiveProfile(choice);
+          return true;
+        }
+      break;
+    }
   }
 }
 
 char * editProfileMenuItems[] = {"st-soak temp","sd-soak duration","pt-peak temp","set"};
 boolean editCustomProfile() {
   int choice = 0;
-  byte val;
+  int val;
+  byte celsius;
   while(1) {
     choice = displayMenu(editProfileMenuItems,4,choice);
     switch(choice) {
@@ -470,8 +487,11 @@ boolean editCustomProfile() {
       case 0:
       case 1:
       case 2:
-        val = *(((byte*)&custom)+choice);
-        *(((byte*)&custom)+choice) = chooseNum(0,255,val);
+        celsius = *(((byte*)&custom)+choice);
+        val = readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_C ? celsius : ctof(celsius);
+        val = chooseNum(0,readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_C ? 255 : ctof(255),val);
+        val = readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_C ? val : ftoc(val);
+        *(((byte*)&custom)+choice) = val;
 
         saveProfile(1,&custom);
       break;
@@ -487,7 +507,12 @@ void doMonitor() {
   int MONITOR_FREQUENCY = 1000;
   while(1) {
     
-    double temp = reflowster.readThermocouple();
+    double temp;
+    if (readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_F) {
+      temp = reflowster.readFahrenheit();
+    } else {
+      temp = reflowster.readCelsius();
+    }
     reflowster.getDisplay()->display((int)temp);
 
     if ((millis() - lastReport) > MONITOR_FREQUENCY) {  //generate a 1000ms event period
@@ -500,6 +525,42 @@ void doMonitor() {
 
     delay(50);
   } 
+}
+
+char * configMenuItems[] = {"temp mode"};
+const int CONFIG_MENU_ITEMS = 1;
+
+char * tempModeMenu[] = {"Cel","Fah"};
+const int TEMP_MODE_ITEMS = 2;
+void configMenu() {
+  int choice = 0;
+  while(1) {
+    choice = displayMenu(configMenuItems,CONFIG_MENU_ITEMS,choice);
+    switch(choice) {
+      case -1: return;
+      case 0:
+        int tempChoice = readConfig(CONFIG_TEMP_MODE);
+        if (tempChoice == 255) tempChoice = DEFAULT_TEMP_MODE;
+        tempChoice = displayMenu(tempModeMenu,TEMP_MODE_ITEMS,tempChoice);
+        if (tempChoice != -1 && tempChoice != readConfig(CONFIG_TEMP_MODE)) {
+          writeConfig(CONFIG_TEMP_MODE,tempChoice);
+        }
+      break;
+    }
+  }  
+}
+
+double ctof(double c) {
+  return ((c*9.0)/5.0)+32.0;
+}
+
+double ftoc(double f) {
+  return ((f-32.0)*5.0)/9.0;
+}
+
+double celsiusToFahrenheitIfNecessary(double c) {
+  if (readConfig(CONFIG_TEMP_MODE) == TEMP_MODE_C) return c;
+  return ctof(c);
 }
 
 #define PHASE_PRE_SOAK 0
@@ -528,7 +589,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   reflowster.relayOn();
   while(1) {
     delay(50);
-    double temp = reflowster.readThermocouple();
+    double temp = reflowster.readCelsius();
     unsigned long currentPhaseSeconds = (millis() - phaseStartTime) / 1000;
     
     if ((millis() - lastReport) > REPORT_INTERVAL) {  //generate a 1000ms event period
@@ -546,7 +607,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
         return -1;
     }
     if (buttonStartTime == 0) {
-      reflowster.getDisplay()->display((int)temp);
+      reflowster.getDisplay()->display((int)celsiusToFahrenheitIfNecessary(temp));
       if (reflowster.getBackButton()) {
         reflowster.getDisplay()->displayMarquee("Hold to cancel");
         buttonStartTime = millis();

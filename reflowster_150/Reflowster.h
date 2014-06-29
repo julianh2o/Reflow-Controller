@@ -40,7 +40,8 @@ public:
   boolean getButton();
   void setKnobPosition(int val);
   int getKnobPosition();
-  double readThermocouple();
+  double readCelsius();
+  double readFahrenheit();
   void relayOn();
   void relayOff();
   void relayToggle();
