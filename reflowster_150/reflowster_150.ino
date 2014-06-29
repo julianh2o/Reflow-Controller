@@ -49,10 +49,13 @@ int activeMode = 0;
 const int MODE_REFLOW=1;
 const int MODE_MENU=2;
 
+const int CONFIG_LOCATION = 200;
+const int CONFIG_SELF_TEST = 0;
+const int CONFIG_SELF_UNITS = 1;
+
 void setup() {
   Serial.begin(9600);
 
-  
   noInterrupts();
   TCCR1A = 0;
   TCCR1B = 0;
@@ -64,9 +67,19 @@ void setup() {
   
   reflowster.init();
   
-  //TODO make it so that the self test runs the first time and then is disabled via a EEPROM write for future launches (after confirmation)
-//  reflowster.selfTest();
-//  while(1);
+  //We run a self test the first time the unit is powered on.. when it passes, the self test is never run again
+  if (readConfig(CONFIG_SELF_TEST) != 0) {
+    reflowster.selfTest();
+    reflowster.getDisplay()->display("pas");
+    while(1) {
+      if (reflowster.getButton()) {
+        writeConfig(CONFIG_SELF_TEST,0);
+        break;
+      }
+      
+      if (reflowster.getBackButton()) break;
+    }
+  }
 
   reflowster.displayTest();
   loadProfiles();
@@ -81,42 +94,6 @@ ISR(TIMER1_OVF_vect) {
     lastService = millis();
   }
   processCommands();
-}
-
-void ledTest() {
-  char rainbow[375] = {0,25,0,1,25,0,2,25,0,3,25,0,4,25,0,6,25,0,7,25,0,8,25,0,9,25,0,11,25,0,12,25,0,13,25,0,14,25,0,15,25,0,17,25,0,18,25,0,19,25,0,20,25,0,22,25,0,23,25,0,24,25,0,25,25,0,25,24,0,25,22,0,25,21,0,25,20,0,25,19,0,25,17,0,25,16,0,25,15,0,25,14,0,25,13,0,25,11,0,25,10,0,25,9,0,25,8,0,25,6,0,25,5,0,25,4,0,25,3,0,25,2,0,25,0,0,25,0,0,25,0,1,25,0,2,25,0,4,25,0,5,25,0,6,25,0,7,25,0,8,25,0,10,25,0,11,25,0,12,25,0,13,25,0,15,25,0,16,25,0,17,25,0,18,25,0,19,25,0,21,25,0,22,25,0,23,25,0,24,24,0,25,23,0,25,22,0,25,21,0,25,19,0,25,18,0,25,17,0,25,16,0,25,15,0,25,13,0,25,12,0,25,11,0,25,10,0,25,8,0,25,7,0,25,6,0,25,5,0,25,4,0,25,2,0,25,1,0,25,0,0,25,0,0,25,0,2,25,0,3,25,0,4,25,0,5,25,0,6,25,0,8,25,0,9,25,0,10,25,0,11,25,0,13,25,0,14,25,0,15,25,0,16,25,0,17,25,0,19,25,0,20,25,0,21,25,0,22,25,0,24,25,0,25,25,0,25,24,0,25,23,0,25,22,0,25,20,0,25,19,0,25,18,0,25,17,0,25,15,0,25,14,0,25,13,0,25,12,0,25,11,0,25,9,0,25,8,0,25,7,0,25,6,0,25,4,0,25,3,0,25,2,0,25,1};
-  
-  reflowster.displayTest();
-  
-  for (int i=0; i<125; i++) {
-    reflowster.setStatusColor(rainbow[i*3],rainbow[i*3+1],rainbow[i*3+2]);
-    delay(20);
-  }
-  for (int a=0; a<3; a++) {
-    for (int l=0; l<2; l++) {
-      for (int i=5; i<30; i++) {
-        reflowster.setStatusColor(a==0?i:0,a==1?i:0,a==2?i:0);
-        delay(10);
-      }
-      for (int i=30; i>5; i--) {
-        reflowster.setStatusColor(a==0?i:0,a==1?i:0,a==2?i:0);
-        delay(10);
-      }
-    }
-  }
-  int v = 50;
-  for (int a=0; a<3; a++) {
-    for (int i=0; i<5; i++) {
-      reflowster.setStatusColor(a==0?v:0,a==1?v:0,a==2?v:0);
-      delay(50);
-      reflowster.setStatusColor(0,0,0);
-      delay(100);
-    }
-    delay(300);
-  }
-  reflowster.setStatusColor(10,10,10);
-  delay(1000);
-  reflowster.setStatusColor(0,0,0);
 }
 
 byte debounceButton(int b) {
@@ -319,11 +296,6 @@ void loadProfiles() {
   if (activeProfile > 2) activeProfile = 0;
 
   loadProfile(1,&custom); //use the leaded profile as the default
-
-  //Serial.println("custom");
-  //Serial.println(custom.soakTemp);
-  //Serial.println(custom.soakTime);
-  //Serial.println(custom.peakTemp);
 }
 
 void loadProfile(byte loc, struct profile * target) {
@@ -345,6 +317,14 @@ void saveProfile(byte loc, struct profile * target) {
   }
 }
 
+void writeConfig(int cfg, byte value) {
+  ewrite(CONFIG_LOCATION+cfg,value);
+}
+
+byte readConfig(int cfg) {
+  return EEPROM.read(CONFIG_LOCATION+cfg);
+}
+
 void ewrite(byte loc, byte val) {
   /*
   Serial.print("EEPROM WRITE ");
@@ -359,7 +339,7 @@ void loop() {
   mainMenu();
 }
 
-char * mainMenuItems[] = {"go","set profile","monitor","yay"};
+char * mainMenuItems[] = {"go","set profile","monitor"};
 void mainMenu() {
   byte lastChoice = 0;
   while(1) {
@@ -377,8 +357,6 @@ void mainMenu() {
       break;
 
       case 2: doMonitor(); break;
-      
-      case 3: ledTest(); break;
     }
   }
 }
@@ -535,6 +513,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   unsigned long buttonStartTime = 0;
   unsigned long lastReport = millis();
   int phase = PHASE_PRE_SOAK;
+  unsigned long MAXIMUM_OVEN_PHASE_TIME = 8*60; //if the oven is on for 8 minutes and we havent hit the desired tempp
 
   Serial.println("Starting Reflow: ");
   Serial.print("Soak Temp: ");
@@ -550,6 +529,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   while(1) {
     delay(50);
     double temp = reflowster.readThermocouple();
+    unsigned long currentPhaseSeconds = (millis() - phaseStartTime) / 1000;
     
     if ((millis() - lastReport) > REPORT_INTERVAL) {  //generate a 1000ms event period
       Serial.print("data: ");
@@ -580,6 +560,10 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
     }
     switch(phase) {
       case PHASE_PRE_SOAK: {
+        if (currentPhaseSeconds > MAXIMUM_OVEN_PHASE_TIME) {
+          reflowster.relayOff();
+          return -1;
+        }
         if (temp >= soakTemp) {
           phase = PHASE_SOAK;
           phaseStartTime = millis();
@@ -589,8 +573,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       }
       
       case PHASE_SOAK: {
-        unsigned long currentSoakSeconds = (millis() - phaseStartTime) / 1000;
-        if (currentSoakSeconds > soakTime) {
+        if (currentPhaseSeconds > soakTime) {
           phase = PHASE_SPIKE;
           phaseStartTime = millis();
           reflowster.relayOn();
@@ -599,7 +582,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       }
       
       case PHASE_SPIKE: {
-        if (temp >= peakTemp) {
+        if (temp >= peakTemp || currentPhaseSeconds > MAXIMUM_OVEN_PHASE_TIME) {
           phase = PHASE_COOL;
           phaseStartTime = millis();
           reflowster.relayOff();

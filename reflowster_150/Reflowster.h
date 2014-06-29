@@ -17,7 +17,17 @@ public:
   int pinConfiguration_encoderA;
   int pinConfiguration_encoderB;
   int pinConfiguration_backButton;
+  int pinConfiguration_displayDS;
+  int pinConfiguration_displaySTCP;
+  int pinConfiguration_displaySHCP;
+  int pinConfiguration_displayD1;
+  int pinConfiguration_displayD2;
+  int pinConfiguration_displayD3;
+  int pinConfiguration_displayDL;
+  int pinConfiguration_beep;
   int pinConfiguration_thermocoupleCS;
+  int pinConfiguration_thermocoupleSCK;
+  int pinConfiguration_thermocoupleMISO;
   
   Reflowster();
   void init();

@@ -1,46 +1,32 @@
 #include "Reflowster.h"
 #include "../Adafruit_MAX31855/Adafruit_MAX31855.h"
 
-int pinConfiguration_statusLed;
-int pinConfiguration_relay;
-int pinConfiguration_encoderButton;
-int pinConfiguration_encoderA;
-int pinConfiguration_encoderB;
-int pinConfiguration_backButton;
-int pinConfiguration_thermocoupleCS;
-int pinConfiguration_displayDS;
-int pinConfiguration_displaySTCP;
-int pinConfiguration_displaySHCP;
-int pinConfiguration_displayD1;
-int pinConfiguration_displayD2;
-int pinConfiguration_displayD3; //todo add display separator
-int pinConfiguration_displayDD;
-int pinConfiguration_beep;
-
 Reflowster::Reflowster() {
   pinConfiguration_statusLed = 12;
-  pinConfiguration_relay = 4;
+  pinConfiguration_relay = 11;
   pinConfiguration_encoderButton = 3;
   pinConfiguration_encoderA = 2;
   pinConfiguration_encoderB = 0;
   pinConfiguration_backButton = 7;
-  pinConfiguration_thermocoupleCS = 1;
   pinConfiguration_displayDS = 5;
   pinConfiguration_displaySTCP = 13;
   pinConfiguration_displaySHCP = A0;
   pinConfiguration_displayD1 = 6;
   pinConfiguration_displayD2 = 9;
   pinConfiguration_displayD3 = 10;
-  pinConfiguration_displayDD = 8;  
+  pinConfiguration_displayDL = 8;
   pinConfiguration_beep = A5;
+  pinConfiguration_thermocoupleCS = 1;
+  pinConfiguration_thermocoupleSCK = SCK;
+  pinConfiguration_thermocoupleMISO = MISO;
 }
 
 void Reflowster::init() {
   status = new Adafruit_NeoPixel(1, pinConfiguration_statusLed, NEO_GRB + NEO_KHZ800);
   knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
-  probe = new Adafruit_MAX31855(SCK,pinConfiguration_thermocoupleCS,MISO);
+  probe = new Adafruit_MAX31855(pinConfiguration_thermocoupleSCK,pinConfiguration_thermocoupleCS,pinConfiguration_thermocoupleMISO);
 
-  display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3);
+  display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3,pinConfiguration_displayDL);
   
   status->begin();
   status->show();
@@ -55,13 +41,6 @@ void Reflowster::init() {
   pinMode(pinConfiguration_displaySTCP, OUTPUT);
   pinMode(pinConfiguration_displaySHCP, OUTPUT);
   pinMode(pinConfiguration_beep, OUTPUT);
-  
-  
-  while(1) {
-    Serial.println(readThermocouple());
-    display->display(readThermocouple());
-    delay(500);
-  }
 }
 
 void Reflowster::selfTest() {
@@ -73,36 +52,57 @@ void Reflowster::selfTest() {
   delay(150);
   noTone(pinConfiguration_beep);
   
-  setStatusColor(50,0,0);
+  display->display("enc");
+  while(!getButton());
+  
+  setStatusColor(25,0,0);
   delay(200);
-  setStatusColor(0,50,0);
+  setStatusColor(0,25,0);
   delay(200);
-  setStatusColor(0,0,50);
+  setStatusColor(0,0,25);
   delay(200);
   setStatusColor(0,0,0);
+  
+  display->display("bck");
+  while(!getBackButton());
   
   relayOn();
   delay(500);
   relayOff();
   
-  display->display("enc");
-  while(!getButton());
-  
-  display->display("bck");
-  while(!getBackButton());
-  
   int pknob = 5;
   setKnobPosition(pknob);
   boolean up = false;
   boolean down = false;
-  while(!up || !down) {
+  while(!getButton()) {
     if (getKnobPosition() > pknob) up = true;
     if (getKnobPosition() < pknob) down = true;
     pknob = getKnobPosition();
     display->display(pknob);
+    if (!up && !down) {
+      setStatusColor(25,0,0);
+    } else if (up && down) {
+      setStatusColor(0,25,0);
+    } else if (up || down) {
+      setStatusColor(25,25,0);
+    }
+    delay(100);
   }
+  setStatusColor(0,0,0);
   
-  //TODO test thermocouple
+  while(getButton()); //debounce
+  delay(500);
+  
+  double temp;
+  while(!getButton()) {
+    temp = readThermocouple();
+    if (isnan(temp)) {
+      display->display("err");
+    } else {
+      display->display(temp);
+    }
+    delay(200);
+  }
   
   tone(pinConfiguration_beep,200);
   delay(150);

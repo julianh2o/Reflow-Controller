@@ -34,24 +34,23 @@ byte ReflowDisplay::alphabet[] = {
     0b01101101  //z
 };
 
-int DS,STCP,SHCP,D1,D2,D3; //tODO protect these variables
-
-ReflowDisplay::ReflowDisplay(int cDS, int cSTCP, int cSHCP, int cD1, int cD2, int cD3) {
-  DS = cDS;
-  STCP = cSTCP;
-  SHCP = cSHCP;
-  D1 = cD1;
-  D2 = cD2;
-  D3 = cD3;
+ReflowDisplay::ReflowDisplay(int cDS, int cSTCP, int cSHCP, int cD1, int cD2, int cD3, int cDL) {
+  pinConfiguration_DS = cDS;
+  pinConfiguration_STCP = cSTCP;
+  pinConfiguration_SHCP = cSHCP;
+  pinConfiguration_D1 = cD1;
+  pinConfiguration_D2 = cD2;
+  pinConfiguration_D3 = cD3;
+  pinConfiguration_DL = cDL;
   
-  pinMode(DS, OUTPUT);
-  pinMode(STCP, OUTPUT);
-  pinMode(SHCP, OUTPUT);
+  pinMode(pinConfiguration_DS, OUTPUT);
+  pinMode(pinConfiguration_STCP, OUTPUT);
+  pinMode(pinConfiguration_SHCP, OUTPUT);
   
-  pinMode(D3, OUTPUT);
-  pinMode(D2, OUTPUT);
-  pinMode(D1, OUTPUT);
-  pinMode(8, OUTPUT);
+  pinMode(pinConfiguration_D3, OUTPUT);
+  pinMode(pinConfiguration_D2, OUTPUT);
+  pinMode(pinConfiguration_D1, OUTPUT);
+  pinMode(pinConfiguration_DL, OUTPUT);
   
   tickCounter = 0;
   displayedDigits[0] = 0;
@@ -155,22 +154,22 @@ void ReflowDisplay::tick() {
 }
 
 void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
-  digitalWrite(D1,LOW);
-  digitalWrite(D2,LOW);
-  digitalWrite(D3,LOW);
+  digitalWrite(pinConfiguration_D1,LOW);
+  digitalWrite(pinConfiguration_D2,LOW);
+  digitalWrite(pinConfiguration_D3,LOW);
   
   //This is a hack because our hardware is broken.. it resets the display before changing the display digit to prevent ghosting
-  digitalWrite(STCP, LOW);
+  digitalWrite(pinConfiguration_STCP, LOW);
   for (char i=0; i<8; i++) {
-    digitalWrite(SHCP,LOW);
-    digitalWrite(DS,1);
-    digitalWrite(SHCP,HIGH);
+    digitalWrite(pinConfiguration_SHCP,LOW);
+    digitalWrite(pinConfiguration_DS,1);
+    digitalWrite(pinConfiguration_SHCP,HIGH);
   }
-  digitalWrite(STCP, HIGH);
+  digitalWrite(pinConfiguration_STCP, HIGH);
   
-  digitalWrite(D1,displayDigit == 0 ? HIGH : LOW);
-  digitalWrite(D2,displayDigit == 1 ? HIGH : LOW);
-  digitalWrite(D3,displayDigit == 2 ? HIGH : LOW);
+  digitalWrite(pinConfiguration_D1,displayDigit == 0 ? HIGH : LOW);
+  digitalWrite(pinConfiguration_D2,displayDigit == 1 ? HIGH : LOW);
+  digitalWrite(pinConfiguration_D3,displayDigit == 2 ? HIGH : LOW);
   
   //This is performing the pin mapping to account for the arbitrary order of the lettered display pins with the output pins of the shift register
   unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
@@ -182,40 +181,41 @@ void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
                 (0b00000010 & (segments >> 4)) |
                 (0b00000001 & (segments << 0));
 
-  digitalWrite(STCP, LOW);
+  digitalWrite(pinConfiguration_STCP, LOW);
   for (char i=0; i<8; i++) {
-    digitalWrite(SHCP,LOW);
-    digitalWrite(DS,!(mapped&1));
-    digitalWrite(SHCP,HIGH);
+    digitalWrite(pinConfiguration_SHCP,LOW);
+    digitalWrite(pinConfiguration_DS,!(mapped&1));
+    digitalWrite(pinConfiguration_SHCP,HIGH);
     mapped = mapped >> 1;
   }
-  digitalWrite(STCP, HIGH);
+  digitalWrite(pinConfiguration_STCP, HIGH);
 }
 
-void displayDigitFix(byte segments, byte displayDigit) {
-  digitalWrite(D1,LOW);
-  digitalWrite(D2,LOW);
-  digitalWrite(D3,LOW);
-
-  unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
-                (0b01000000 & (segments << 3)) |
-                (0b00100000 & (segments << 1)) |
-                (0b00010000 & (segments << 2)) |
-                (0b00001000 & (segments << 2)) |
-                (0b00000100 & (segments >> 4)) |
-                (0b00000010 & (segments >> 4)) |
-                (0b00000001 & (segments << 0));
-
-  digitalWrite(STCP, LOW);
-  for (char i=0; i<8; i++) {
-    digitalWrite(SHCP,LOW);
-    digitalWrite(DS,!(mapped&1));
-    digitalWrite(SHCP,HIGH);
-    mapped = mapped >> 1;
-  }
-  digitalWrite(STCP, HIGH);
-  
-  digitalWrite(D1,displayDigit == 0 ? HIGH : LOW);
-  digitalWrite(D2,displayDigit == 1 ? HIGH : LOW);
-  digitalWrite(D3,displayDigit == 2 ? HIGH : LOW);
-}
+//TODO reinstate me when the hardware is fixed
+//void displayDigitFix(byte segments, byte displayDigit) {
+//  digitalWrite(pinConfiguration_D1,LOW);
+//  digitalWrite(pinConfiguration_D2,LOW);
+//  digitalWrite(pinConfiguration_D3,LOW);
+//
+//  unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
+//                (0b01000000 & (segments << 3)) |
+//                (0b00100000 & (segments << 1)) |
+//                (0b00010000 & (segments << 2)) |
+//                (0b00001000 & (segments << 2)) |
+//                (0b00000100 & (segments >> 4)) |
+//                (0b00000010 & (segments >> 4)) |
+//                (0b00000001 & (segments << 0));
+//
+//  digitalWrite(pinConfiguration_STCP, LOW);
+//  for (char i=0; i<8; i++) {
+//    digitalWrite(pinConfiguration_SHCP,LOW);
+//    digitalWrite(pinConfiguration_DS,!(mapped&1));
+//    digitalWrite(pinConfiguration_SHCP,HIGH);
+//    mapped = mapped >> 1;
+//  }
+//  digitalWrite(pinConfiguration_STCP, HIGH);
+//  
+//  digitalWrite(pinConfiguration_D1,displayDigit == 0 ? HIGH : LOW);
+//  digitalWrite(pinConfiguration_D2,displayDigit == 1 ? HIGH : LOW);
+//  digitalWrite(pinConfiguration_D3,displayDigit == 2 ? HIGH : LOW);
+//}
