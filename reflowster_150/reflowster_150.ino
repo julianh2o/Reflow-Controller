@@ -1,7 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 #include <Encoder.h>
-#include <Adafruit_MAX31855.h>
+#include "Adafruit_MAX31855.h"
 
 #include <string.h>
 #include <Time.h>

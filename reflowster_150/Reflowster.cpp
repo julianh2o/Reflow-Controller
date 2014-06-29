@@ -1,4 +1,5 @@
 #include "Reflowster.h"
+#include "../Adafruit_MAX31855/Adafruit_MAX31855.h"
 
 int pinConfiguration_statusLed;
 int pinConfiguration_relay;
@@ -37,7 +38,7 @@ Reflowster::Reflowster() {
 void Reflowster::init() {
   status = new Adafruit_NeoPixel(1, pinConfiguration_statusLed, NEO_GRB + NEO_KHZ800);
   knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
-//  probe = new MAX31855(pinConfiguration_thermocoupleCS);
+  probe = new Adafruit_MAX31855(SCK,pinConfiguration_thermocoupleCS,MISO);
 
   display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3);
   
@@ -54,6 +55,13 @@ void Reflowster::init() {
   pinMode(pinConfiguration_displaySTCP, OUTPUT);
   pinMode(pinConfiguration_displaySHCP, OUTPUT);
   pinMode(pinConfiguration_beep, OUTPUT);
+  
+  
+  while(1) {
+    Serial.println(readThermocouple());
+    display->display(readThermocouple());
+    delay(500);
+  }
 }
 
 void Reflowster::selfTest() {
@@ -158,7 +166,7 @@ int Reflowster::getKnobPosition() {
 // Thermocouple
 ///////////////
 double Reflowster::readThermocouple() {
-//  return probe->extTemp(0);
+  return probe->readCelsius();
 }
 
 // Relay

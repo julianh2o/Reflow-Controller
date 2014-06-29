@@ -6,7 +6,8 @@
 #include <SPI.h>
 #include <Encoder.h>
 #include "ReflowDisplay.h"
-#include <MAX31855.h>
+
+class Adafruit_MAX31855;
 
 class Reflowster {
 public:
@@ -38,8 +39,9 @@ public:
 private:
   Adafruit_NeoPixel * status;
   Encoder * knob;
-//  MAX31855 * probe;
+  Adafruit_MAX31855 * probe;
   ReflowDisplay * display;
 };
 
 #endif
+
