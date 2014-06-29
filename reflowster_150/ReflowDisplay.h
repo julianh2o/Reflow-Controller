@@ -20,6 +20,7 @@ public:
   
 private:
   int tickCounter;
+  unsigned long marqueeTimer;
   byte displayedDigits[3];
   char * marqueeString;
   int marqueeLength;

@@ -144,14 +144,14 @@ void ReflowDisplay::setSegment(byte segment, byte index) {
 }
 
 void ReflowDisplay::tick() {
-  if (tickCounter % 200 == 0) {
+  if ((millis() - marqueeTimer) > 200) {
     marqueeHandler();
-    tickCounter = 0;
+    marqueeTimer = millis();
   }
   
-  displayDigit(displayedDigits[tickCounter % 3],tickCounter % 3); //cycles through the digits displaying each one for a tick
+  displayDigit(displayedDigits[tickCounter],tickCounter); //cycles through the digits displaying each one for a tick
   
-  tickCounter++;
+  tickCounter = ( tickCounter+1 ) % 3;
 }
 
 void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
@@ -159,12 +159,20 @@ void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
   digitalWrite(D2,LOW);
   digitalWrite(D3,LOW);
   
-//  Serial.println(segments,BIN);
-//  segments = 0b00000000;
+  //This is a hack because our hardware is broken.. it resets the display before changing the display digit to prevent ghosting
+  digitalWrite(STCP, LOW);
+  for (char i=0; i<8; i++) {
+    digitalWrite(SHCP,LOW);
+    digitalWrite(DS,1);
+    digitalWrite(SHCP,HIGH);
+  }
+  digitalWrite(STCP, HIGH);
+  
+  digitalWrite(D1,displayDigit == 0 ? HIGH : LOW);
+  digitalWrite(D2,displayDigit == 1 ? HIGH : LOW);
+  digitalWrite(D3,displayDigit == 2 ? HIGH : LOW);
+  
   //This is performing the pin mapping to account for the arbitrary order of the lettered display pins with the output pins of the shift register
-//  Serial.print("n = 0b");
-//  Serial.print(n,BIN);
-//  Serial.println();
   unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
                 (0b01000000 & (segments << 3)) |
                 (0b00100000 & (segments << 1)) |
@@ -173,10 +181,30 @@ void ReflowDisplay::displayDigit(byte segments, byte displayDigit) {
                 (0b00000100 & (segments >> 4)) |
                 (0b00000010 & (segments >> 4)) |
                 (0b00000001 & (segments << 0));
-                
-//  Serial.print("m = 0b");
-//  Serial.print(mapped,BIN);
-//  Serial.println();
+
+  digitalWrite(STCP, LOW);
+  for (char i=0; i<8; i++) {
+    digitalWrite(SHCP,LOW);
+    digitalWrite(DS,!(mapped&1));
+    digitalWrite(SHCP,HIGH);
+    mapped = mapped >> 1;
+  }
+  digitalWrite(STCP, HIGH);
+}
+
+void displayDigitFix(byte segments, byte displayDigit) {
+  digitalWrite(D1,LOW);
+  digitalWrite(D2,LOW);
+  digitalWrite(D3,LOW);
+
+  unsigned char mapped = (0b10000000 & (segments << 0)) | //TODO make this clearer and more obvious??
+                (0b01000000 & (segments << 3)) |
+                (0b00100000 & (segments << 1)) |
+                (0b00010000 & (segments << 2)) |
+                (0b00001000 & (segments << 2)) |
+                (0b00000100 & (segments >> 4)) |
+                (0b00000010 & (segments >> 4)) |
+                (0b00000001 & (segments << 0));
 
   digitalWrite(STCP, LOW);
   for (char i=0; i<8; i++) {

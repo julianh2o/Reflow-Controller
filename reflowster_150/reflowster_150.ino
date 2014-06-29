@@ -63,15 +63,24 @@ void setup() {
   interrupts();
   
   reflowster.init();
+  
+  //TODO make it so that the self test runs the first time and then is disabled via a EEPROM write for future launches (after confirmation)
+//  reflowster.selfTest();
+//  while(1);
+
   reflowster.displayTest();
   loadProfiles();
 }
 
+unsigned long lastService = millis();
 ISR(TIMER1_OVF_vect) {
   TCNT1 = 65500;
   
-//  reflowster.tick();
-//  processCommands();
+  if (millis() - lastService > 1) {
+    reflowster.tick();
+    lastService = millis();
+  }
+  processCommands();
 }
 
 void ledTest() {

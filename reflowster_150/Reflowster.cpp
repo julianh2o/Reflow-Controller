@@ -22,8 +22,8 @@ Reflowster::Reflowster() {
   pinConfiguration_encoderButton = 3;
   pinConfiguration_encoderA = 2;
   pinConfiguration_encoderB = 0;
-  pinConfiguration_backButton = 1;
-  pinConfiguration_thermocoupleCS = 7;
+  pinConfiguration_backButton = 7;
+  pinConfiguration_thermocoupleCS = 1;
   pinConfiguration_displayDS = 5;
   pinConfiguration_displaySTCP = 13;
   pinConfiguration_displaySHCP = A0;
@@ -36,7 +36,7 @@ Reflowster::Reflowster() {
 
 void Reflowster::init() {
   status = new Adafruit_NeoPixel(1, pinConfiguration_statusLed, NEO_GRB + NEO_KHZ800);
-//  knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
+  knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
 //  probe = new MAX31855(pinConfiguration_thermocoupleCS);
 
   display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3);
@@ -54,78 +54,59 @@ void Reflowster::init() {
   pinMode(pinConfiguration_displaySTCP, OUTPUT);
   pinMode(pinConfiguration_displaySHCP, OUTPUT);
   pinMode(pinConfiguration_beep, OUTPUT);
-  
+}
 
+void Reflowster::selfTest() {
+  display->displayMarquee("Testing");
   
-  //Serial.begin(9600);
-
-//    while(!getBackButton()) {
-//      delay(1000);
-//      Serial.println("not back..");
-//    }
-//    delay(100);
-//    while(getBackButton()) {
-//      delay(1000);
-//      Serial.println("back..");
-//    }
-//    Serial.println("button");
-//    delay(100);
   tone(pinConfiguration_beep,200);
   delay(150);
   tone(pinConfiguration_beep,230);
   delay(150);
   noTone(pinConfiguration_beep);
   
-  status->setPixelColor(0,status->Color(100,0,0));
+  setStatusColor(50,0,0);
   delay(200);
-  status->setPixelColor(0,status->Color(0,100,0));
+  setStatusColor(0,50,0);
   delay(200);
-  status->setPixelColor(0,status->Color(0,0,100));
+  setStatusColor(0,0,50);
   delay(200);
-  status->setPixelColor(0,status->Color(0,0,0));
+  setStatusColor(0,0,0);
   
-//  digitalWrite(pinConfiguration_displaySTCP,LOW);
-//  digitalWrite(pinConfiguration_displayDS,HIGH);
-//  digitalWrite(pinConfiguration_displaySHCP,LOW);
-//  while(1);x
-        
-//  display->display("abc");
-  byte a = 1;
-  while(1) {
-//    delay(500);
-///    display->display("cde");
-    display->displayDigit(0b00000001,0);
-    delay(400);
-    display->displayDigit(0b00000010,0);
-    delay(400);
-    display->displayDigit(0b00000011,0);
-    delay(400);
-    display->displayDigit(0b00000000,0);
-    delay(400);
-    display->displayDigit(0b11111100,0);
-    delay(400);
-
-//    display->displayDigit(a,0);
-//    Serial.println(a);
-// display->tick();
-//    a = a << 1;
+  relayOn();
+  delay(500);
+  relayOff();
+  
+  display->display("enc");
+  while(!getButton());
+  
+  display->display("bck");
+  while(!getBackButton());
+  
+  int pknob = 5;
+  setKnobPosition(pknob);
+  boolean up = false;
+  boolean down = false;
+  while(!up || !down) {
+    if (getKnobPosition() > pknob) up = true;
+    if (getKnobPosition() < pknob) down = true;
+    pknob = getKnobPosition();
+    display->display(pknob);
   }
   
-  //setKnobPosition(50);
-
-  Encoder k(2,0);
-  while(1) {
-    status->setPixelColor(0,status->Color(0,getKnobPosition(),0));
-    Serial.println(digitalRead(pinConfiguration_encoderA));
-    Serial.println(digitalRead(pinConfiguration_encoderB));
-    Serial.println();
-    status->show();
-    delay(200);
-  }
+  //TODO test thermocouple
+  
+  tone(pinConfiguration_beep,200);
+  delay(150);
+  tone(pinConfiguration_beep,230);
+  delay(150);
+  noTone(pinConfiguration_beep);
+  
+  display->clear();
 }
 
 void Reflowster::tick() {
-  //display->tick();
+  display->tick();
 }
 
 // Status

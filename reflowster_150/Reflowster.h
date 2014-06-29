@@ -20,6 +20,7 @@ public:
   
   Reflowster();
   void init();
+  void selfTest();
   void tick();
   void setStatusColor(byte r, byte g, byte b);
   ReflowDisplay * getDisplay();
