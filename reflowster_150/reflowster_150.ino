@@ -87,6 +87,7 @@ void setup() {
 
   reflowster.displayTest();
   loadProfiles();
+  reflowster.setStatusPulse(0,50,0);
 }
 
 unsigned long lastService = millis();
@@ -353,8 +354,6 @@ void mainMenu() {
       doReflow();
     }
     int choice = displayMenu(mainMenuItems,MAIN_MENU_SIZE,lastChoice);
-    Serial.print("choice: ");
-    Serial.println(choice);
     if (choice != -1) lastChoice = choice;
     switch(choice) {
       case 0: doReflow(); break;
@@ -587,6 +586,8 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   int REPORT_INTERVAL = 200;
   
   reflowster.relayOn();
+  byte pulseColors = 0;
+  int pulse = 0;
   while(1) {
     delay(50);
     double temp = reflowster.readCelsius();

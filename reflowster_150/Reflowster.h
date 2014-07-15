@@ -34,6 +34,7 @@ public:
   void selfTest();
   void tick();
   void setStatusColor(byte r, byte g, byte b);
+  void setStatusPulse(byte r, byte g, byte b);
   ReflowDisplay * getDisplay();
   void displayTest();
   boolean getBackButton();
@@ -52,6 +53,11 @@ private:
   Encoder * knob;
   Adafruit_MAX31855 * probe;
   ReflowDisplay * display;
+  
+  int pulseStatus;
+  byte pulseColor[3];
+  
+  void handlePulse();
 };
 
 #endif

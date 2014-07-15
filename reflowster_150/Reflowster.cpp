@@ -115,13 +115,43 @@ void Reflowster::selfTest() {
 
 void Reflowster::tick() {
   display->tick();
+  
+//  handlePulse();
 }
 
 // Status
 /////////
 void Reflowster::setStatusColor(byte r, byte g, byte b) {
+  pulseStatus = -1;
   status->setPixelColor(0, status->Color(r,g,b));
   status->show(); 
+}
+
+void Reflowster::setStatusPulse(byte r, byte g, byte b) {
+  pulseStatus = 0;
+  pulseColor[0] = r;
+  pulseColor[1] = g;
+  pulseColor[2] = b;
+}
+
+#define PULSE_DURATION 100
+#define PULSE_MIN 0.3
+void Reflowster::handlePulse() {
+  if (pulseStatus != -1) {
+    float currentPulseMagnitude = (float)(pulseStatus > PULSE_DURATION ? 2*PULSE_DURATION - pulseStatus : pulseStatus) / (float)PULSE_DURATION;
+    Serial.print("current pulse mag ");
+    Serial.println(currentPulseMagnitude);
+    float ledMultiplier = PULSE_MIN + (1.0-PULSE_MIN)*currentPulseMagnitude;
+    pulseStatus = (pulseStatus + 1) % PULSE_DURATION*2;
+    Serial.print("pulse status ");
+    Serial.println(pulseStatus);
+    Serial.print("ledMultiplier ");
+    Serial.println(ledMultiplier);
+    Serial.print("g value ");
+    Serial.println(pulseColor[1]*ledMultiplier);
+    status->setPixelColor(0, status->Color((int)ledMultiplier*pulseColor[0],(int)ledMultiplier*pulseColor[1],(int)ledMultiplier*pulseColor[2]));
+    status->show();
+  }
 }
 
 // Display

@@ -15,7 +15,7 @@ public:
   void tick();
   void clear();
   
-    void displayDigit(byte segments, byte displayDigit);  //TODO make private
+  void displayDigit(byte segments, byte displayDigit);  //TODO make private
   
 private:
   int pinConfiguration_DS;
