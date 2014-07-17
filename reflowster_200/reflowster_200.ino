@@ -87,7 +87,7 @@ void setup() {
 
   reflowster.displayTest();
   loadProfiles();
-  reflowster.setStatusPulse(0,50,0);
+  reflowster.setStatusPulse(0,40,0);
 }
 
 unsigned long lastService = millis();
@@ -229,6 +229,8 @@ int displayMenu(char * options[], int len, int defaultChoice) {
   int menuIndex = -1;
   reflowster.setKnobPosition(defaultChoice);
   while(1) {
+    reflowster.pulseTick();
+    
     if (activeCommand != 0) return -1;
     if (debounceButton(reflowster.pinConfiguration_encoderButton)) {
       reflowster.getDisplay()->clear();

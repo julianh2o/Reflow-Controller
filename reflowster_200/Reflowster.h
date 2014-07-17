@@ -33,6 +33,7 @@ public:
   void init();
   void selfTest();
   void tick();
+  void pulseTick();
   void setStatusColor(byte r, byte g, byte b);
   void setStatusPulse(byte r, byte g, byte b);
   ReflowDisplay * getDisplay();
