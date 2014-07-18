@@ -7,6 +7,8 @@
 #include <EEPROM.h>
 #include "Reflowster.h"
 
+const int REVISION=0;
+
 /*
 go
 set profile
@@ -85,8 +87,9 @@ void setup() {
   }
 
   reflowster.displayTest();
+  reflowster.getDisplay()->display(REVISION);
+  delay(500);
   loadProfiles();
-  reflowster.setStatusPulse(0,40,0);
 }
 
 unsigned long lastService = millis();
@@ -590,6 +593,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
   byte pulseColors = 0;
   int pulse = 0;
   while(1) {
+    reflowster.pulseTick();
     delay(50);
     double temp = reflowster.readCelsius();
     unsigned long currentPhaseSeconds = (millis() - phaseStartTime) / 1000;
@@ -623,6 +627,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
     }
     switch(phase) {
       case PHASE_PRE_SOAK: {
+        reflowster.setStatusPulse(25,5,0);
         if (currentPhaseSeconds > MAXIMUM_OVEN_PHASE_TIME) {
           reflowster.relayOff();
           return -1;
@@ -636,6 +641,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       }
       
       case PHASE_SOAK: {
+        reflowster.setStatusPulse(25,15,0);
         if (currentPhaseSeconds > soakTime) {
           phase = PHASE_SPIKE;
           phaseStartTime = millis();
@@ -645,6 +651,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       }
       
       case PHASE_SPIKE: {
+        reflowster.setStatusPulse(25,0,0);
         if (temp >= peakTemp || currentPhaseSeconds > MAXIMUM_OVEN_PHASE_TIME) {
           phase = PHASE_COOL;
           phaseStartTime = millis();
@@ -654,6 +661,7 @@ byte reflowImpl(byte soakTemp, byte soakTime, byte peakTemp) {
       }
       
       case PHASE_COOL: {
+        reflowster.setStatusPulse(0,0,25);
         unsigned long currentCoolSeconds = (millis() - phaseStartTime) / 1000;
         if (debounceButton(reflowster.pinConfiguration_backButton) || debounceButton(reflowster.pinConfiguration_encoderButton)) {
 //        if (currentCoolSeconds > 30 || temp < 60 || debounceButton(reflowster.pinConfiguration_backButton) || debounceButton(reflowster.pinConfiguration_encoderButton)) {

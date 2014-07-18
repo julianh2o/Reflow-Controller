@@ -122,7 +122,7 @@ void Reflowster::tick() {
 
 long lastPulseCall = millis();
 void Reflowster::pulseTick() {
-  if (millis() - lastPulseCall > 100) {
+  if (millis() - lastPulseCall > 50) {
     handlePulse();
     lastPulseCall = millis();
   }
