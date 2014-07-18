@@ -1,5 +1,6 @@
+#include "Arduino.h"
 #include "Reflowster.h"
-#include "../Adafruit_MAX31855/Adafruit_MAX31855.h"
+#include "Adafruit_MAX31855.h"
 
 Reflowster::Reflowster() {
   pinConfiguration_statusLed = 12;
