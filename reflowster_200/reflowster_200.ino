@@ -244,18 +244,28 @@ int displayMenu(char * options[], int len, int defaultChoice) {
     }
     
     int newIndex = reflowster.getKnobPosition();
+    Serial.println();
+    Serial.print("oldIndex: ");
+    Serial.println(menuIndex);
+    Serial.print("newIndex: ");
+    Serial.println(newIndex);
     
     if (newIndex >= len) {
       newIndex = len - 1;
+      Serial.print("setting knob: ");
+      Serial.println(newIndex);
       reflowster.setKnobPosition(newIndex);
     }
     
     if (newIndex < 0) {
       newIndex = 0;
+      Serial.print("setting knob: ");
+      Serial.println(newIndex);
       reflowster.setKnobPosition(newIndex);
     }
     
     if (newIndex != menuIndex) {
+      reflowster.beep(400,20);
       menuIndex = newIndex;
       reflowster.getDisplay()->displayMarquee(options[menuIndex]);
     }
@@ -363,7 +373,7 @@ void mainMenu() {
       case 0: doReflow(); break;
 
       case 1: 
-        if (setProfile()) choice = 0;
+        if (setProfile()) lastChoice = 0;
       break;
 
       case 2: doMonitor(); break;

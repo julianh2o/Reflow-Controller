@@ -26,7 +26,6 @@ void Reflowster::init() {
   status = new Adafruit_NeoPixel(1, pinConfiguration_statusLed, NEO_GRB + NEO_KHZ800);
   knob = new Encoder(pinConfiguration_encoderA, pinConfiguration_encoderB);
   probe = new Adafruit_MAX31855(pinConfiguration_thermocoupleSCK,pinConfiguration_thermocoupleCS,pinConfiguration_thermocoupleMISO);
-
   display = new ReflowDisplay(pinConfiguration_displayDS,pinConfiguration_displaySTCP,pinConfiguration_displaySHCP,pinConfiguration_displayD1,pinConfiguration_displayD2,pinConfiguration_displayD3,pinConfiguration_displayDL);
   
   status->begin();
@@ -44,16 +43,24 @@ void Reflowster::init() {
   pinMode(pinConfiguration_beep, OUTPUT);
   
   pulseStatus = -1;
+  
+//  while(1) {
+//    Serial.print("pos: ");
+//    Serial.println(knob->read());
+//    if (getButton()) {
+//      knob->write(0);
+//    }
+//    delay(20);
+//  }
 }
 
 void Reflowster::selfTest() {
   display->displayMarquee("Testing");
   
-  tone(pinConfiguration_beep,200);
+  beep(200,150);
   delay(150);
-  tone(pinConfiguration_beep,230);
-  delay(150);
-  noTone(pinConfiguration_beep);
+  beep(230,150);
+  delay(150); 
   
   display->display("enc");
   while(!getButton());
@@ -107,11 +114,10 @@ void Reflowster::selfTest() {
     delay(200);
   }
   
-  tone(pinConfiguration_beep,200);
+  beep(200,150);
   delay(150);
-  tone(pinConfiguration_beep,230);
+  beep(230,150);
   delay(150);
-  noTone(pinConfiguration_beep);
   
   display->clear();
 }
@@ -126,6 +132,12 @@ void Reflowster::pulseTick() {
     handlePulse();
     lastPulseCall = millis();
   }
+}
+
+// Tone
+/////////
+void Reflowster::beep(int freq, int duration) {
+   tone(pinConfiguration_beep,freq,duration); 
 }
 
 // Status
@@ -148,19 +160,9 @@ void Reflowster::setStatusPulse(byte r, byte g, byte b) {
 void Reflowster::handlePulse() {
   if (pulseStatus != -1) {
     float currentPulseMagnitude = (float)(pulseStatus > PULSE_DURATION ? 2*PULSE_DURATION - pulseStatus : pulseStatus) / (float)PULSE_DURATION;
-    Serial.print("current pulse mag ");
-    Serial.println(currentPulseMagnitude);
     float ledMultiplier = PULSE_MIN + (1.0-PULSE_MIN)*currentPulseMagnitude;
     pulseStatus = (pulseStatus + 1);
     if (pulseStatus > PULSE_DURATION*2) pulseStatus = 0;
-    Serial.print("pulse status ");
-    Serial.println(pulseStatus);
-    Serial.print("ledMultiplier ");
-    Serial.println(ledMultiplier);
-    Serial.print("g value ");
-    Serial.println(pulseColor[1]*ledMultiplier);
-//    status->setPixelColor(0, status->Color(20,0,0));
-//    status->show();
     status->setPixelColor(0, status->Color((int)(ledMultiplier*pulseColor[0]),(int)(ledMultiplier*pulseColor[1]),(int)(ledMultiplier*pulseColor[2])));
     status->show();
   }
@@ -196,11 +198,15 @@ boolean Reflowster::getButton() {
 // Encoder
 //////////
 void Reflowster::setKnobPosition(int val) {
+//    Serial.print("raw write: ");
+//    Serial.println(val);
     knob->write(val << 2); 
 }
 
 int Reflowster::getKnobPosition() {
     long encPosition = knob->read();
+//    Serial.print("raw read: ");
+//    Serial.println(encPosition);
     int enc = (int)(encPosition >> 2);
     return enc;
 }
