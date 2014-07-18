@@ -1,7 +1,7 @@
 #ifndef Reflowster_h
 #define Reflowster_h
 
-#include <arduino.h>
+#include "Arduino.h"
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 #include <Encoder.h>

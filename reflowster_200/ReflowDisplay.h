@@ -1,7 +1,7 @@
 #ifndef ReflowDisplay_h
 #define ReflowDisplay_h
 
-#include <arduino.h>
+#include "Arduino.h"
 
 class ReflowDisplay {
 public:
